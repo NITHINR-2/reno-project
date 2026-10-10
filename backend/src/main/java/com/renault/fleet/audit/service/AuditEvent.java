@@ -1,5 +1,7 @@
 package com.renault.fleet.audit.service;
 
+import com.renault.fleet.security.AuthenticatedUser;
+
 /**
  * What to write to {@code audit_logs}. Build with {@link #of(String, String, String)} and the {@code with*} methods.
  * JSON fields hold already-serialised JSON (or null).
@@ -22,6 +24,10 @@ public record AuditEvent(
 
     public AuditEvent withActor(Long id, String username, String role) {
         return new AuditEvent(action, entityType, entityId, id, username, role, beforeJson, afterJson, reason, ipAddress);
+    }
+
+    public AuditEvent withActor(AuthenticatedUser actor) {
+        return actor == null ? this : withActor(actor.id(), actor.username(), actor.role().name());
     }
 
     public AuditEvent withChange(String before, String after) {

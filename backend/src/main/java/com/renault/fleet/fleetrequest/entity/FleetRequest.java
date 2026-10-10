@@ -3,6 +3,7 @@ package com.renault.fleet.fleetrequest.entity;
 import com.renault.fleet.catalog.entity.VehicleVariant;
 import com.renault.fleet.common.persistence.BaseEntity;
 import com.renault.fleet.dealer.entity.Dealer;
+import com.renault.fleet.fleetrequest.service.ProductionCalculator;
 import com.renault.fleet.production.entity.Plant;
 import com.renault.fleet.user.entity.User;
 import jakarta.persistence.Column;
@@ -14,9 +15,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 
-/** A dealer's fleet request. Status changes only through the WorkflowService (later phase). */
+/** A dealer's fleet request. Status changes only through the WorkflowService. */
 @Entity
 @Table(name = "fleet_requests")
 public class FleetRequest extends BaseEntity {
@@ -73,6 +75,13 @@ public class FleetRequest extends BaseEntity {
     @JoinColumn(name = "assigned_to_id")
     private User assignedTo;
 
+    /** Set when Marketing maps stock (even to zero units); required before qualification. */
+    private Instant stockMappedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "stock_mapped_by_id")
+    private User stockMappedBy;
+
     protected FleetRequest() {
     }
 
@@ -81,7 +90,24 @@ public class FleetRequest extends BaseEntity {
         this.dealer = dealer;
         this.variant = variant;
         this.quantity = quantity;
+        this.productionRequired = ProductionCalculator.required(quantity, 0);
         this.createdBy = createdBy;
+    }
+
+    /** Sets the allocated quantity and recomputes {@code productionRequired} from it. */
+    public void applyAllocation(int allocated) {
+        this.allocatedQty = allocated;
+        this.productionRequired = ProductionCalculator.required(quantity, allocated);
+    }
+
+    public void markStockMapped(User by, Instant at) {
+        this.stockMappedBy = by;
+        this.stockMappedAt = at;
+    }
+
+    public void clearStockMapping() {
+        this.stockMappedBy = null;
+        this.stockMappedAt = null;
     }
 
     public String getRequestNumber() { return requestNumber; }
@@ -91,11 +117,13 @@ public class FleetRequest extends BaseEntity {
     public Plant getPlant() { return plant; }
     public void setPlant(Plant plant) { this.plant = plant; }
     public int getQuantity() { return quantity; }
-    public void setQuantity(int quantity) { this.quantity = quantity; }
+    /** Changes the quantity and recomputes {@code productionRequired} against the current allocation. */
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+        this.productionRequired = ProductionCalculator.required(quantity, allocatedQty);
+    }
     public int getAllocatedQty() { return allocatedQty; }
-    public void setAllocatedQty(int allocatedQty) { this.allocatedQty = allocatedQty; }
     public int getProductionRequired() { return productionRequired; }
-    public void setProductionRequired(int productionRequired) { this.productionRequired = productionRequired; }
     public BigDecimal getRequiredDeposit() { return requiredDeposit; }
     public void setRequiredDeposit(BigDecimal requiredDeposit) { this.requiredDeposit = requiredDeposit; }
     public Integer getProductionEstimateWeeks() { return productionEstimateWeeks; }
@@ -113,4 +141,6 @@ public class FleetRequest extends BaseEntity {
     public User getCreatedBy() { return createdBy; }
     public User getAssignedTo() { return assignedTo; }
     public void setAssignedTo(User assignedTo) { this.assignedTo = assignedTo; }
+    public Instant getStockMappedAt() { return stockMappedAt; }
+    public User getStockMappedBy() { return stockMappedBy; }
 }

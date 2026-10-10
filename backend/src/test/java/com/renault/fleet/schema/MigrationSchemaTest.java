@@ -43,7 +43,7 @@ class MigrationSchemaTest {
         variantId = id("insert into vehicle_variants (model_id, code, name, fuel_type, unit_price) values (?, 'T-VAR', 'Test Variant', 'PETROL', 1200000.00) returning id", modelId);
         long roleId = id("select id from roles where code = 'FINANCE_TEAM'");
         userId = id("insert into users (username, email, full_name, password_hash, role_id) values ('t-schema', 't-schema@test.local', 'T', 'x', ?) returning id", roleId);
-        requestId = id("insert into fleet_requests (request_number, dealer_id, variant_id, quantity, created_by_id) values ('FLT-2099-0001', ?, ?, 50, ?) returning id", dealerId, variantId, userId);
+        requestId = id("insert into fleet_requests (request_number, dealer_id, variant_id, quantity, production_required, created_by_id) values ('FLT-2099-0001', ?, ?, 50, 50, ?) returning id", dealerId, variantId, userId);
         taxRateId = id("insert into tax_rates (vehicle_category, rate, effective_from) values ('T_SUV', 0.1800, DATE '2020-01-01') returning id");
     }
 
@@ -51,7 +51,7 @@ class MigrationSchemaTest {
     void allMigrationsAppliedAndNothingPending() {
         assertThat(flyway.info().pending()).isEmpty();
         MigrationInfo current = flyway.info().current();
-        assertThat(current.getVersion().getVersion()).isEqualTo("6");
+        assertThat(current.getVersion().getVersion()).isEqualTo("7");
 
         List<String> tables = jdbc.queryForList("""
                 select table_name from information_schema.tables

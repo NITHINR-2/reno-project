@@ -122,3 +122,100 @@ Frontend not touched this phase (no frontend commands run).
 ### Next
 
 Waiting for the Phase 2 prompt. Nothing from later phases has been started.
+
+---
+
+## Phase 2 — Domain services, WorkflowService, marketing/executive endpoints, stock allocation, dev seed (2026-10-11) ✅
+
+### New dependencies
+
+None.
+
+### What was done
+
+- **Flyway V7:**
+  - `fleet_requests.stock_mapped_at/by`, with a both-or-neither CHECK
+  - `CHECK (production_required = quantity - allocated_qty)`
+  - `fleet_request_number_seq` (starts at 1000)
+- **Services, DTOs, validation, pagination and filtering** (package-by-feature, hand-written mappers, `PageResponse`, JPA `Specification` filters):
+  - **Dealers:** `GET /api/dealers` (`q`, `regionId`, `status`), `GET /{id}`, `POST`, `PATCH` (onboarding/activation, audited). Write needs `ADMIN_DEALERS_MANAGE`; read needs it or `FLEET_REQUEST_READ`.
+  - **Vehicle catalogue:** `GET /api/vehicle-models` (`q`, `category`, `active`, variants included) and `GET /{id}`. Read-only.
+  - **Inventory:**
+    - `GET /api/inventory/locations` (`type`, `regionId`, `plantId`, `active`)
+    - `GET /api/inventory/stock` (`variantId`, `modelId`, `locationId`, `locationType`, `availableOnly`, `activeLocationsOnly`)
+    - `GET /api/fleet-requests/{id}/stock-options`
+    - `PUT /api/fleet-requests/{id}/stock-allocations` (`STOCK_MAP`)
+  - **Fleet requests:**
+    - `GET /api/fleet-requests` (multi-`status`, `dealerId`, `regionId`, `variantId`, `modelId`, `plantId`, `q`, `createdFrom/To`)
+    - `GET /{id}`: detail with allocations, eligible stock, `depositReceived` and `allowedActions`
+    - `GET /{id}/history`
+    - `POST` and `PATCH` (PENDING_MARKETING_REVIEW only, `version` required)
+- **Workflow:**
+  - `WorkflowTransitions` is the explicit table of every CLAUDE.md row: (from, action, to, roles, guard, reason required), with SUPERVISOR on every human row and an automatic QUOTATION_ISSUED → PAYMENT_PENDING row.
+  - `WorkflowService.transition` locks the request row, then checks in order: role (403), state (409), version (409), reason (400) and guard (409).
+  - Each transition writes one `workflow_history` row and one `audit_logs` row (`WORKFLOW_<ACTION>`, before/after JSON) in the same transaction.
+  - CANCEL releases allocations. It is service-level only for now.
+- **Endpoints:**
+  - Marketing: `POST /{id}/submit-for-qualification`, `/forward-to-marketing-head`, `/resubmit`
+  - Executive: `POST /{id}/approve`, `/reject` (reason required), `/forward-to-finance`
+- **Stock allocation:**
+  - The request row and every touched stock row are locked with `SELECT … FOR UPDATE` in ascending id order. Stock ids are read before locking, so no stale managed entity is used.
+  - Old allocations are released and flushed before new ones are inserted.
+  - Production is recomputed and a `STOCK_MAPPED` history event plus an audit row are written.
+  - `PessimisticLockingFailureException` → 409.
+- **Dev seed (`DevBusinessSeeder`, `@Order(2)` after `DevUserSeeder`):**
+  - 3 regions, 2 plants, 3 dealers (2 ACTIVE)
+  - Duster, Kiger, Triber and Kwid variants
+  - 3 locations with stock; Duster RXZ Petrol has 30 units at Chennai Yard
+  - SUV GST 18% (flagged for Finance)
+  - FLT-2026-0891, unallocated, with an APPROVED ₹10,00,000 deposit receipt
+- **Docs:** a Phase 2 section in DECISIONS.md, and the dev data plus the Swagger walkthrough in the README.
+
+### Commands run and real results
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o compile` (after main code) | exit 0 |
+| `./mvnw -o verify` (existing tests only, with V7) | **BUILD SUCCESS**: 37 tests, 0 failures. `MigrationSchemaTest` fixture updated for the new production CHECK and V7. |
+| `./mvnw -o verify` (with new tests, 1st run) | **FAILED**: 1243 tests, 16 failures, all test-side. Postgres `jsonb` normalises whitespace, so string `contains` checks on audit JSON failed. `jsonPath(...).value(List.of(...))` can't coerce to an immutable list. A dealer list test shared a region with another test. A 403 check sent an invalid body, and validation runs before method security, giving 400. |
+| Fixes: parse audit JSON with JsonPath, use Hamcrest `contains`, give the dealer test its own region, send a valid body for the 403 check (behaviour logged in DECISIONS.md) | — |
+| `./mvnw -o test -Dtest=DealerApiTest,FleetRequestCrudApiTest,Flt0891WalkthroughTest,FleetRequestWorkflowApiTest` | **BUILD SUCCESS**: 201 tests, 0 failures |
+| End-to-end check on scratch DB `fleet_p2check`: `java -jar target/fleet-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev --server.port=18080` | Flyway "Successfully applied 7 migrations … now at version v7". 5 users seeded, then "Dev seed: created FLT-2026-0891 (PENDING_MARKETING_REVIEW)". |
+| curl walkthrough (the same endpoints Swagger exposes) | Detail: Chennai North / Duster RXZ Petrol / qty 50 / eligible stock 30 / deposit required 5,000,000 / received 1,000,000 / Pune Plant / 6 weeks. Map 30 → allocated 30, production 20, `allowedActions` [QUALIFY]. MM approve → **403**. Forward before qualify → **409**. Qualify → MARKETING_QUALIFIED; forward → PENDING_EXECUTIVE_APPROVAL; MH approve → EXECUTIVE_APPROVED; forward-to-finance → **PENDING_FINANCE_CLEARANCE**. History has 6 rows. `audit_logs` has DEV_SEED, STOCK_MAPPED and 4 WORKFLOW_* rows with correct before→after status. Stock row: available 0, allocated 30. `/v3/api-docs` lists all 17 new or updated paths. |
+| Scratch app stopped, `drop database fleet_p2check` | Done. The dev database `fleet` was not touched. |
+| `./mvnw -o verify` (final) | **BUILD SUCCESS**: **1243 tests, 0 failures, 0 errors** (1:14 min) |
+
+**Test breakdown:**
+- WorkflowTransitionsTest: 985, every status × action × role plus table, guard and reason checks
+- FleetRequestWorkflowApiTest: 191, each endpoint × 5 roles (200 or 403) and every wrong source state (409), plus guard, reason, version, 404 and reject/resubmit loop
+- AuthControllerTest: 16
+- FleetRequestAuthorizationTest: 8
+- MigrationSchemaTest: 8
+- ProductionCalculatorTest: 8
+- FleetRequestCrudApiTest: 6
+- DealerApiTest: 3
+- CatalogInventoryApiTest: 3
+- StockMappingApiTest: 3
+- TransactionRollbackTest: 3, covering a failing second line, a failed remap keeping the original allocation, and an audit failure rolling back the transition
+- StockAllocationConcurrencyTest: 2, with 2 threads racing for the last unit (exactly 1 wins) and 8 threads racing for 5 units (exactly 5 win; losers get a clean 409)
+- OpenApiTest: 2
+- HealthControllerTest: 2
+- FleetApplicationTests: 1
+- WorkflowServiceTest: 1, cancel needs a reason, is SUPERVISOR-only and releases stock
+- Flt0891WalkthroughTest: 1, real dev seeders, the full Swagger path
+
+Frontend not touched this phase (no frontend commands run).
+
+### Known issues / broken
+
+- None blocking.
+- The first `spring-boot:run` against the local `fleet` database will apply V7 and seed the business data. That database has not been started with this code yet.
+- Body validation (400) runs before `@PreAuthorize` (403). An unauthorised caller sending a malformed body gets 400. Logged in DECISIONS.md.
+- Finance-row guards (issued quotation, approved receipts ≥ required) are not implemented; no endpoint reaches those rows yet.
+- CANCEL and other Supervisor actions have no HTTP endpoints yet.
+- No regions/plants list endpoints yet; the frontend create form will need them.
+- Business audit rows don't record the client IP.
+
+### Next
+
+Waiting for the Phase 3 prompt. Nothing from later phases has been started.

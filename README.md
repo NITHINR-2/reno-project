@@ -67,6 +67,19 @@ Open http://localhost:5173. The page shows the backend and database health from 
 | `marketing.head` | MARKETING_HEAD |
 | `finance` | FINANCE_TEAM |
 
+**Dev business data** (dev profile only, idempotent): regions, plants, dealers, the vehicle catalogue, inventory, the Duster GST rate, and request **FLT-2026-0891**. It is Chennai North Dealership, Duster RXZ Petrol, qty 50, 30 units in the Chennai Yard, Pune Plant, 6 weeks, with a ₹50,00,000 deposit required and ₹10,00,000 received (an approved deposit receipt).
+
+### Swagger walkthrough: FLT-2026-0891 to PENDING_FINANCE_CLEARANCE
+
+1. `POST /api/auth/login` as `marketing.manager`, then click **Authorize** and paste the `accessToken`.
+2. `GET /api/fleet-requests?q=FLT-2026-0891` and note the `id`.
+3. `GET /api/fleet-requests/{id}/stock-options` and note the Chennai Yard stock `id` (30 available).
+4. `PUT /api/fleet-requests/{id}/stock-allocations` with `{"lines":[{"stockId":<stock id>,"quantity":30}]}`. This gives allocated 30 and production required 20.
+5. `POST /api/fleet-requests/{id}/submit-for-qualification`, then `POST /api/fleet-requests/{id}/forward-to-marketing-head`.
+6. Log in as `marketing.head` and re-authorize.
+7. `POST /api/fleet-requests/{id}/approve`, then `POST /api/fleet-requests/{id}/forward-to-finance`. The request is now `PENDING_FINANCE_CLEARANCE`.
+8. `GET /api/fleet-requests/{id}/history` shows each step.
+
 ## Build and test
 
 ```bash
@@ -84,4 +97,4 @@ cd frontend && npm run test -- --run && npm run build && npm run lint
 
 ## Roles
 
-ADMIN, SUPERVISOR, MARKETING_MANAGER, MARKETING_HEAD and FINANCE_TEAM. Roles and permissions are seeded by Flyway (`V6__seed_roles_permissions.sql`) and enforced on the server with `@PreAuthorize`. See `claude.md` for the access matrix and workflow state machine; the workflow itself arrives in a later phase.
+ADMIN, SUPERVISOR, MARKETING_MANAGER, MARKETING_HEAD and FINANCE_TEAM. Roles and permissions are seeded by Flyway (`V6__seed_roles_permissions.sql`) and enforced on the server with `@PreAuthorize`. See `claude.md` for the access matrix and workflow state machine. The marketing and executive stages of the workflow are implemented (Phase 2); finance, production and dispatch follow in later phases.

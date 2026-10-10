@@ -67,3 +67,36 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **Dev users: `admin`, `supervisor`, `marketing.manager`, `marketing.head`, `finance` (`<username>@fleet.local`)** — a missing `DEV_*_PASSWORD` skips that user with a warning; existing users are never overwritten.
 - **A `Clock` bean (UTC) is injected for token timing** — makes time-dependent logic testable.
 - **Tests create users with random suffixes in `@BeforeAll`; schema tests run in rolled-back transactions** — tests share one Testcontainers DB per Spring context.
+
+## Phase 2 — Domain services, workflow, stock allocation
+
+- **`fleet_requests.stock_mapped_at/by` (V7)** — "qualify (stock mapped)" must be provable even when zero stock is available, so mapping is recorded explicitly rather than inferred from `allocated_qty > 0`.
+- **`CHECK (production_required = quantity - allocated_qty)` (V7)** — with `allocated ≤ quantity` already enforced this is exactly `max(0, requested − allocated)`; the entity recomputes it on every quantity/allocation change and the database catches drift.
+- **Request numbers `FLT-<IST year>-<n>` from `fleet_request_number_seq` starting at 1000** — one global sequence (no per-year reset) is simple and unique; starting at 1000 keeps generated numbers clear of hand-seeded ones like 0891.
+- **The transition table lives in `WorkflowTransitions` (pure, unit-testable) and is applied only by `WorkflowService`** — one service owns status changes; the table covers every CLAUDE.md row, SUPERVISOR is on every human row, and QUOTATION_ISSUED → PAYMENT_PENDING is a system row applied automatically.
+- **Role check before state check: a role that may never take an action gets 403 even from a wrong state; an allowed role in the wrong state gets 409** — permission is the stable property; state is transient.
+- **Endpoints also carry `@PreAuthorize` permission checks; body validation (400) runs before method security, so a malformed body from an unauthorised user gets 400, a well-formed one 403** — Spring resolves arguments before the method-security proxy; nothing is executed or leaked beyond field-level validation messages.
+- **Finance-row guards (issued quotation exists, approved receipts ≥ required) are deferred to the Finance phase** — the rows exist so the table and its tests are complete, but no Phase 2 endpoint can reach them.
+- **CANCEL is implemented and tested at service level but has no HTTP endpoint yet** — the prompt's Phase 2 endpoint list doesn't include it; it lands with the Supervisor features.
+- **RESUBMIT endpoint (`POST /{id}/resubmit`) added** — without it a rejected request could never return to marketing review.
+- **Allocations are kept on reject (the request returns to marketing with its stock still held) and released on cancel** — matches CLAUDE.md ("cancel … releases stock allocations"); marketing can re-map after resubmitting.
+- **Requests are editable (PATCH) only in PENDING_MARKETING_REVIEW, version required; null fields mean "no change"** — CLAUDE.md scope; clearing optional fields isn't supported yet. A variant change releases allocations and clears the stock mapping; lowering quantity below the allocation is a 409.
+- **Stock mapping is a replace (`PUT /{id}/stock-allocations`), allowed only in PENDING_MARKETING_REVIEW; an empty list is valid (produce everything)** — idempotent and easy to reason about; each mapping writes a `STOCK_MAPPED` history event (from = to) and an audit row.
+- **Locking order: request row first, then stock rows in ascending id; stock ids are read with a scalar query before locking** — prevents deadlocks, and avoids Hibernate returning a stale already-managed entity from a `FOR UPDATE` query.
+- **Released allocations are flushed before new ones are inserted** — Hibernate executes inserts before updates, which would otherwise violate `ux_stock_allocations_active` when re-mapping the same stock row.
+- **Eligible stock = same variant, active location, `available > 0`; region is ignored** — CLAUDE.md doesn't restrict allocation by region; the dealer's region can be added as a preference later.
+- **Workflow transitions lock the request row (`FOR UPDATE`) and also honour an optional client `version`** — concurrent transitions serialise instead of failing late; stale UIs get a 409.
+- **`PessimisticLockingFailureException` → 409** — a lock timeout or deadlock is a retryable conflict, not a 500.
+- **Detail DTO includes `allowedActions` for the caller's role (guards evaluated)** — lets the UI mirror the backend; the server re-checks every action.
+- **`depositReceived` = sum of APPROVED DEPOSIT receipts** — "eligible deposits" in the quotation formula; recorded-but-unapproved receipts don't count.
+- **Catalogue is read-only over the API** — CLAUDE.md gives no role catalogue write access.
+- **Dealer create/update require `ADMIN_DEALERS_MANAGE`; reads allow it or `FLEET_REQUEST_READ`; onboarding is one-way (never back to PENDING_ONBOARDING); `onboardedAt` is set on first activation.**
+- **Business audit rows have no IP address yet** — CLAUDE.md requires actor, action, entity, before/after, reason and timestamp; IP capture can be added with a request-context helper later.
+- **Audit before/after JSON is a flat snapshot of business fields with association ids only** — no lazy loading, stable shape.
+- **List date filters (`createdFrom`/`createdTo`) are IST calendar days** — the business timezone.
+- **Dev business seed is a Java `ApplicationRunner` (`@Profile("dev")`, `@Order(2)` after `DevUserSeeder`), idempotent by code** — the seeded request needs a real `created_by` user, which only exists after the user seeder.
+- **FLT-2026-0891 is seeded unallocated** — the Swagger walkthrough then exercises stock mapping, and 30 yard units → 20 to produce is computed by the real code rather than hard-coded.
+- **"Deposit available ₹10,00,000" is seeded as an APPROVED DEPOSIT receipt (`DEV-SEED-DEP-0891`) reviewed by `finance`** — the deposit lives in the payments model rather than a new column.
+- **Only the Duster's category (`SUV`) gets a GST rate (18% from 2026-01-01, open-ended, flagged "must be confirmed by Finance")** — other models use other categories (COMPACT_SUV, MPV, HATCHBACK) so the seed doesn't invent rates.
+- **Seed falls back to `supervisor` when `marketing.manager`/`finance` are missing, and skips the request (not master data) when no user exists** — dev startup never fails because a password env var is unset.
+- **Integration tests use `TestFleetData` with random codes and real commits; the concurrency test is not `@Transactional`** — the shared Testcontainers DB stays consistent and threads really see each other's commits.
