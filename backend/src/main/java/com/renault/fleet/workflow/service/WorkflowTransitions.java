@@ -10,6 +10,7 @@ import com.renault.fleet.fleetrequest.entity.FleetRequest;
 import com.renault.fleet.fleetrequest.entity.FleetRequestStatus;
 import com.renault.fleet.user.entity.RoleCode;
 import com.renault.fleet.workflow.entity.WorkflowAction;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -27,9 +28,9 @@ public final class WorkflowTransitions {
     /** Returns a failure message when the transition must not happen, or empty when it may. */
     @FunctionalInterface
     public interface Guard {
-        Optional<String> check(FleetRequest request);
+        Optional<String> check(FleetRequest request, WorkflowFacts facts);
 
-        Guard NONE = request -> Optional.empty();
+        Guard NONE = (request, facts) -> Optional.empty();
     }
 
     public record Transition(FleetRequestStatus from, WorkflowAction action, FleetRequestStatus to,
@@ -54,15 +55,26 @@ public final class WorkflowTransitions {
         }
     }
 
-    private static final Guard STOCK_MAPPED = r -> r.getStockMappedAt() != null
+    private static final Guard STOCK_MAPPED = (r, facts) -> r.getStockMappedAt() != null
             ? Optional.empty()
             : Optional.of("Stock must be mapped before the request can be qualified.");
-    private static final Guard NEEDS_PRODUCTION = r -> r.getProductionRequired() > 0
+    private static final Guard NEEDS_PRODUCTION = (r, facts) -> r.getProductionRequired() > 0
             ? Optional.empty()
             : Optional.of("No production is required; schedule dispatch instead.");
-    private static final Guard NO_PRODUCTION = r -> r.getProductionRequired() == 0
+    private static final Guard NO_PRODUCTION = (r, facts) -> r.getProductionRequired() == 0
             ? Optional.empty()
             : Optional.of("Production of " + r.getProductionRequired() + " units must be scheduled first.");
+    private static final Guard QUOTATION_ISSUED_EXISTS = (r, facts) -> facts.hasIssuedQuotation(r.getId())
+            ? Optional.empty()
+            : Optional.of("An ISSUED quotation is required; issue the draft quotation first.");
+    /** Funds are verified when approved deposits cover the required deposit. */
+    private static final Guard DEPOSIT_COVERED = (r, facts) -> {
+        BigDecimal eligible = facts.eligibleDeposits(r.getId());
+        return eligible.compareTo(r.getRequiredDeposit()) >= 0
+                ? Optional.empty()
+                : Optional.of("Approved deposits of " + eligible.toPlainString() + " do not cover the required deposit of "
+                        + r.getRequiredDeposit().toPlainString() + ".");
+    };
 
     private static final List<Transition> TABLE = build();
 
@@ -77,11 +89,10 @@ public final class WorkflowTransitions {
         rows.add(row(PENDING_EXECUTIVE_APPROVAL, WorkflowAction.REJECT, RETURNED_TO_MARKETING, Guard.NONE, true, MARKETING_HEAD));
         rows.add(row(RETURNED_TO_MARKETING, WorkflowAction.RESUBMIT, PENDING_MARKETING_REVIEW, Guard.NONE, false, MARKETING_MANAGER));
         rows.add(row(EXECUTIVE_APPROVED, WorkflowAction.FORWARD_TO_FINANCE, PENDING_FINANCE_CLEARANCE, Guard.NONE, false, MARKETING_HEAD));
-        // Finance rows: data guards (issued quotation, approved receipts) are added with the Finance phase.
-        rows.add(row(PENDING_FINANCE_CLEARANCE, WorkflowAction.ISSUE_QUOTATION, QUOTATION_ISSUED, Guard.NONE, false, FINANCE_TEAM));
+        rows.add(row(PENDING_FINANCE_CLEARANCE, WorkflowAction.ISSUE_QUOTATION, QUOTATION_ISSUED, QUOTATION_ISSUED_EXISTS, false, FINANCE_TEAM));
         rows.add(new Transition(QUOTATION_ISSUED, WorkflowAction.AWAIT_PAYMENT, PAYMENT_PENDING, Set.of(), Guard.NONE, false));
-        rows.add(row(PAYMENT_PENDING, WorkflowAction.VERIFY_FUNDS, FUNDS_VERIFIED, Guard.NONE, false, FINANCE_TEAM));
-        rows.add(row(FUNDS_VERIFIED, WorkflowAction.GRANT_CLEARANCE, FINANCIALLY_CLEARED, Guard.NONE, false, FINANCE_TEAM));
+        rows.add(row(PAYMENT_PENDING, WorkflowAction.VERIFY_FUNDS, FUNDS_VERIFIED, DEPOSIT_COVERED, false, FINANCE_TEAM));
+        rows.add(row(FUNDS_VERIFIED, WorkflowAction.GRANT_CLEARANCE, FINANCIALLY_CLEARED, DEPOSIT_COVERED, false, FINANCE_TEAM));
         rows.add(row(FINANCIALLY_CLEARED, WorkflowAction.SCHEDULE_PRODUCTION, PRODUCTION_SCHEDULED, NEEDS_PRODUCTION, false));
         rows.add(row(FINANCIALLY_CLEARED, WorkflowAction.SCHEDULE_DISPATCH, DISPATCH_SCHEDULED, NO_PRODUCTION, false));
         rows.add(row(PRODUCTION_SCHEDULED, WorkflowAction.SCHEDULE_DISPATCH, DISPATCH_SCHEDULED, Guard.NONE, false));
@@ -127,10 +138,10 @@ public final class WorkflowTransitions {
     }
 
     /** Actions {@code role} could take on {@code request} right now (state, role and guard all pass). */
-    public static List<WorkflowAction> available(FleetRequest request, RoleCode role) {
+    public static List<WorkflowAction> available(FleetRequest request, RoleCode role, WorkflowFacts facts) {
         return TABLE.stream()
                 .filter(t -> t.from() == request.getStatus() && t.roles().contains(role))
-                .filter(t -> t.guard().check(request).isEmpty())
+                .filter(t -> t.guard().check(request, facts).isEmpty())
                 .map(Transition::action)
                 .distinct()
                 .toList();

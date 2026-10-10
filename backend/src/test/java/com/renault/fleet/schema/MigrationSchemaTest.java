@@ -51,7 +51,7 @@ class MigrationSchemaTest {
     void allMigrationsAppliedAndNothingPending() {
         assertThat(flyway.info().pending()).isEmpty();
         MigrationInfo current = flyway.info().current();
-        assertThat(current.getVersion().getVersion()).isEqualTo("7");
+        assertThat(current.getVersion().getVersion()).isEqualTo("8");
 
         List<String> tables = jdbc.queryForList("""
                 select table_name from information_schema.tables

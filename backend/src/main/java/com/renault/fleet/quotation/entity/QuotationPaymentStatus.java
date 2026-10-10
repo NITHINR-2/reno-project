@@ -4,5 +4,13 @@ package com.renault.fleet.quotation.entity;
 public enum QuotationPaymentStatus {
     UNPAID,
     PARTIALLY_PAID,
-    PAID
+    PAID;
+
+    /** Derived from approved receipts only: nothing approved is UNPAID, at least the total is PAID. */
+    public static QuotationPaymentStatus from(java.math.BigDecimal approved, java.math.BigDecimal total) {
+        if (approved.signum() == 0) {
+            return UNPAID;
+        }
+        return approved.compareTo(total) >= 0 ? PAID : PARTIALLY_PAID;
+    }
 }

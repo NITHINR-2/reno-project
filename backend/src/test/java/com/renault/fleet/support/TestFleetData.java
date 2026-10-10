@@ -18,9 +18,12 @@ import com.renault.fleet.inventory.entity.InventoryStock;
 import com.renault.fleet.inventory.entity.LocationType;
 import com.renault.fleet.inventory.repository.InventoryLocationRepository;
 import com.renault.fleet.inventory.repository.InventoryStockRepository;
+import com.renault.fleet.quotation.entity.TaxRate;
+import com.renault.fleet.quotation.repository.TaxRateRepository;
 import com.renault.fleet.user.entity.User;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Component;
@@ -43,10 +46,11 @@ public class TestFleetData {
     private final InventoryLocationRepository locations;
     private final InventoryStockRepository stock;
     private final FleetRequestRepository requests;
+    private final TaxRateRepository taxRates;
 
     public TestFleetData(RegionRepository regions, DealerRepository dealers, VehicleModelRepository models,
             VehicleVariantRepository variants, InventoryLocationRepository locations, InventoryStockRepository stock,
-            FleetRequestRepository requests) {
+            FleetRequestRepository requests, TaxRateRepository taxRates) {
         this.regions = regions;
         this.dealers = dealers;
         this.models = models;
@@ -54,6 +58,7 @@ public class TestFleetData {
         this.locations = locations;
         this.stock = stock;
         this.requests = requests;
+        this.taxRates = taxRates;
     }
 
     public World world() {
@@ -61,6 +66,17 @@ public class TestFleetData {
     }
 
     public World world(DealerStatus dealerStatus) {
+        return world(dealerStatus, "T_SUV");
+    }
+
+    /** A world whose model has its own vehicle category with a GST rate in force since 2020 (for quotation tests). */
+    public World worldWithGst(String rate) {
+        String category = "TF_" + suffix();
+        taxRates.save(new TaxRate(category, new BigDecimal(rate), LocalDate.of(2020, 1, 1)));
+        return world(DealerStatus.ACTIVE, category);
+    }
+
+    public World world(DealerStatus dealerStatus, String category) {
         String s = suffix();
         Region region = regions.save(new Region("R-" + s, "Region " + s));
         Dealer dealer = new Dealer("D-" + s, "Dealer " + s, region, "Chennai", "Tamil Nadu");
@@ -69,7 +85,7 @@ public class TestFleetData {
             dealer.setOnboardedAt(Instant.now());
         }
         dealer = dealers.save(dealer);
-        VehicleModel model = models.save(new VehicleModel("M-" + s, "Model " + s, "T_SUV"));
+        VehicleModel model = models.save(new VehicleModel("M-" + s, "Model " + s, category));
         VehicleVariant variant = variants.save(new VehicleVariant(model, "V-" + s, "Variant " + s, FuelType.PETROL,
                 new BigDecimal("1200000.00")));
         return new World(region, dealer, model, variant);
@@ -88,8 +104,13 @@ public class TestFleetData {
 
     /** A request put straight into {@code status} (fixtures only; real code goes through WorkflowService). */
     public FleetRequest request(World world, int quantity, FleetRequestStatus status, User creator, boolean stockMapped) {
+        return request(world, quantity, status, creator, stockMapped, new BigDecimal("500000.00"));
+    }
+
+    public FleetRequest request(World world, int quantity, FleetRequestStatus status, User creator, boolean stockMapped,
+            BigDecimal requiredDeposit) {
         FleetRequest request = new FleetRequest(requestNumber(), world.dealer(), world.variant(), quantity, creator);
-        request.setRequiredDeposit(new BigDecimal("500000.00"));
+        request.setRequiredDeposit(requiredDeposit);
         request.setStatus(status);
         if (status == FleetRequestStatus.RETURNED_TO_MARKETING) {
             request.setReturnReason("fixture");

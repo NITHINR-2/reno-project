@@ -18,10 +18,24 @@ Monorepo: `frontend/` (React), `backend/` (Spring Boot), PostgreSQL via `docker-
 6. Never claim a build or test passed unless you ran it in this session and saw it pass. If something is blocked by the environment (no Docker, no network), say so plainly and continue with what can run.
 7. Ask me only when a choice affects security or business correctness and isn't covered here. Otherwise decide, log it, and continue.
 
+## Token and time efficiency (always)
+
+- Don't re-read files you have already read this session. Use Grep or Glob to find code instead of reading whole folders.
+- Change files with small Edits. Never rewrite a whole file to change a few lines.
+- Follow the existing patterns in the codebase. Don't redesign anything that already works.
+- Keep command output short:
+  - `./mvnw -q`
+  - `npm test -- --run --reporter=dot`
+  - pipe long logs to `| tail -40`
+- While working, run only the tests for what you just changed, e.g. `./mvnw -q test -Dtest=FinanceServiceTest`. Run the full suite once, at the end of the phase.
+- Don't explain code back to me or narrate each step. Report only: what was built, the test results, and anything blocked.
+- If the same error happens 3 times, stop, write it in PROGRESS.md and tell me. Don't keep retrying.
+- Keep PROGRESS.md updates to about 10 lines per phase.
+
 ## Stack (use current stable, mutually compatible versions; record exact versions in PROGRESS.md)
 
 - **Frontend:** React, TypeScript (strict), Vite, Tailwind CSS, React Router, TanStack Query, React Hook Form and Zod, Axios, Lucide React, Vitest with React Testing Library.
-- **Backend:** Java 21, Spring Boot 4.x (4.1.1, see docs/DECISIONS.md), Maven Wrapper, Spring Web/Security/Data JPA, Bean Validation, Flyway, springdoc-openapi, JUnit 5, Mockito, Testcontainers.
+- **Backend:** Java 21, Spring Boot 3.x, Maven Wrapper, Spring Web/Security/Data JPA, Bean Validation, Flyway, springdoc-openapi, JUnit 5, Mockito, Testcontainers.
 - **Database:** PostgreSQL 16. The schema comes only from Flyway migrations, so set `spring.jpa.hibernate.ddl-auto=validate`.
 
 ## Architecture rules

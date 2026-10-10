@@ -13,6 +13,7 @@ import com.renault.fleet.payment.entity.ReceiptStatus;
 import com.renault.fleet.payment.entity.ReceiptType;
 import com.renault.fleet.payment.repository.PaymentReceiptRepository;
 import com.renault.fleet.user.entity.RoleCode;
+import com.renault.fleet.workflow.service.WorkflowFacts;
 import com.renault.fleet.workflow.service.WorkflowTransitions;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,16 +28,18 @@ public class FleetRequestDetailAssembler {
     private final PaymentReceiptRepository receipts;
     private final FleetRequestMapper mapper;
     private final InventoryMapper inventoryMapper;
+    private final WorkflowFacts facts;
 
     public FleetRequestDetailAssembler(FleetRequestRepository requests, StockAllocationRepository allocations,
             InventoryStockRepository stock, PaymentReceiptRepository receipts, FleetRequestMapper mapper,
-            InventoryMapper inventoryMapper) {
+            InventoryMapper inventoryMapper, WorkflowFacts facts) {
         this.requests = requests;
         this.allocations = allocations;
         this.stock = stock;
         this.receipts = receipts;
         this.mapper = mapper;
         this.inventoryMapper = inventoryMapper;
+        this.facts = facts;
     }
 
     @Transactional(readOnly = true)
@@ -56,6 +59,6 @@ public class FleetRequestDetailAssembler {
         long eligible = stock.sumEligibleAvailable(request.getVariant().getId());
         var depositReceived = receipts.sumAmount(request.getId(), ReceiptType.DEPOSIT, ReceiptStatus.APPROVED);
         return mapper.toDetail(request, active, eligible, depositReceived,
-                WorkflowTransitions.available(request, viewerRole));
+                WorkflowTransitions.available(request, viewerRole, facts));
     }
 }

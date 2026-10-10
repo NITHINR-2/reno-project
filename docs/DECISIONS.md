@@ -100,3 +100,28 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **Only the Duster's category (`SUV`) gets a GST rate (18% from 2026-01-01, open-ended, flagged "must be confirmed by Finance")** — other models use other categories (COMPACT_SUV, MPV, HATCHBACK) so the seed doesn't invent rates.
 - **Seed falls back to `supervisor` when `marketing.manager`/`finance` are missing, and skips the request (not master data) when no user exists** — dev startup never fails because a password env var is unset.
 - **Integration tests use `TestFleetData` with random codes and real commits; the concurrency test is not `@Transactional`** — the shared Testcontainers DB stays consistent and threads really see each other's commits.
+
+## Phase 3A — Quotations, receipts, funds verification, clearance
+
+- **Finance guards read DB facts through a `WorkflowFacts` interface (issued quotation exists; approved DEPOSIT total)** — the transition table stays pure and unit-testable with a stub; the Spring implementation queries quotations and receipts inside the caller's transaction.
+- **"approve receipts ≥ required" means approved DEPOSIT receipts ≥ the request's `requiredDeposit`** — the same "eligible deposits" figure as the quotation shortfall formula; PAYMENT-type receipts don't count toward the deposit. *Business assumption; to be confirmed with Finance* (the alternative reading is "≥ quotation total").
+- **VERIFY_FUNDS happens automatically**: on receipt approval, and on issue if deposits approved earlier already cover the requirement — the approval is the Finance act; there is no separate verify endpoint.
+- **GRANT_CLEARANCE re-checks that approved deposits still cover the requirement** — defence in depth; nothing un-approves a receipt today, but the guard costs one query.
+- **Calculate creates a new DRAFT each time and marks earlier DRAFTs CANCELLED** — every figure Finance saw stays on record.
+- **Calculation is allowed only in PENDING_FINANCE_CLEARANCE; issue only from DRAFT and only in that state** — after issue the request is PAYMENT_PENDING and the ISSUED quotation is fixed.
+- **Issue re-computes the breakdown (current unit price, GST rate effective today in IST, approved deposits) and refuses a stale draft with 409** — Finance never issues figures it didn't review; recalculate, then issue.
+- **One line per quotation (the request's variant × quantity); the calculator supports many lines, each rounded HALF_UP to 2 dp, then summed** — the CLAUDE.md money rule; the unit price is quantised to 2 dp before multiplying.
+- **Totals must fit NUMERIC(15,2) (13 integer digits), otherwise 409** — fail early instead of a database error.
+- **No GST rate for the model's category on today's IST date gives a 409 naming the category** — Finance must configure rates; nothing is defaulted.
+- **Quotation validity defaults to 30 days (`fleet.quotation.validity-days`); the default terms text (`fleet.quotation.default-terms`) is a placeholder for Finance's wording.**
+- **Issuing never touches money: `paymentStatus` is derived only from APPROVED receipts (UNPAID / PARTIALLY_PAID / PAID against the quotation total)** — set at issue (deposits approved earlier count) and refreshed on each approval.
+- **Issued quotation amounts (deposit received, shortfall) are not changed after issue** — the document stays as issued; live figures come from receipts. The immutable snapshot and PDF hash arrive in Phase 6.
+- **Numbers: `QT-<IST year>-<5+ digits>` and `RCPT-<IST year>-<5+ digits>` from sequences (V8).**
+- **Receipts can be recorded and approved only in PENDING_FINANCE_CLEARANCE, PAYMENT_PENDING and FUNDS_VERIFIED** — the finance stages; later balance payments can be added with dispatch.
+- **Duplicate references are rejected twice over: a pre-check with the same `upper(trim())` normalisation as the unique index (clear 409), and the index itself (a concurrent loser gets the same 409)** — duplicate-payment protection can't be bypassed, including by SUPERVISOR.
+- **`receivedDate` can't be after today in IST, checked in the service rather than with `@PastOrPresent`** — the JVM runs in UTC, which would reject valid IST dates for 5½ hours each night.
+- **Approval locks the request row, then the receipt row (`FOR UPDATE`), reading the request id by scalar query first; a non-RECORDED receipt is 409** — same lock order as every other write; concurrent approvals serialise and exactly one wins.
+- **No reject-receipt endpoint and no maker-checker rule (the recorder may approve) yet** — not in the Phase 3A brief; worth adding if Finance needs segregation of duties.
+- **Readers: quotations need `QUOTATION_READ` (FIN, MH, SUP); receipts need `PAYMENT_RECORD` or `DEPOSIT_REVIEW`, so the Marketing Head can review deposits.**
+- **Every quotation calculation, issue, receipt record and approval writes an audit row with before/after JSON and a `workflow_history` event (QUOTATION_CALCULATED, RECEIPT_RECORDED, RECEIPT_APPROVED; transitions as usual).**
+- **Finance tests give each world its own vehicle category and GST rate** — tax-rate periods can't overlap per category, and the shared test DB must not collide with `MigrationSchemaTest`'s rolled-back T_SUV rate.

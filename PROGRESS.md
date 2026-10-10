@@ -219,3 +219,79 @@ Frontend not touched this phase (no frontend commands run).
 ### Next
 
 Waiting for the Phase 3 prompt. Nothing from later phases has been started.
+
+---
+
+## Phase 3A — Quotations, payment receipts, funds verification, clearance (2026-10-11) ✅
+
+### New dependencies
+
+None.
+
+### What was done
+
+- **Flyway V8:** `quotation_number_seq` and `receipt_number_seq`.
+- **Workflow:** the finance guards are now live through `WorkflowFacts`:
+  - ISSUE_QUOTATION needs an ISSUED quotation.
+  - VERIFY_FUNDS and GRANT_CLEARANCE need approved deposits ≥ the required deposit.
+  - `WorkflowService.verifyFundsIfCovered` performs PAYMENT_PENDING → FUNDS_VERIFIED when covered.
+- **`QuotationCalculator`:** pure BigDecimal rules. Per line, `base = qty × unitPrice` and `gst = base × rate`, each HALF_UP to 2 dp, then summed. `total = base + gst`, `shortfall = max(0, required − eligibleDeposits)`, with a NUMERIC(15,2) overflow check.
+- **Quotation endpoints:**
+  - `POST /api/fleet-requests/{id}/quotations/calculate` (`QUOTATION_ISSUE`) creates a DRAFT with the full breakdown. Earlier drafts become CANCELLED. Allowed only in PENDING_FINANCE_CLEARANCE; 409 if there's no GST rate for the category.
+  - `POST /api/quotations/{id}/issue` (`QUOTATION_ISSUE`) moves DRAFT → ISSUED (issue date, valid until +30 days). The request then goes QUOTATION_ISSUED → PAYMENT_PENDING through `WorkflowService`, with the second step taken automatically by the system. A stale draft gets 409. `paymentStatus` comes only from approved receipts.
+  - `GET /api/fleet-requests/{id}/quotations` and `GET /api/quotations/{id}` (`QUOTATION_READ`).
+- **Receipt endpoints:**
+  - `POST /api/fleet-requests/{id}/payment-receipts` (`PAYMENT_RECORD`). The transaction reference must be unique ignoring case and spaces (409). The received date can't be in the future (IST). Finance stages only.
+  - `POST /api/payment-receipts/{id}/approve` (`PAYMENT_APPROVE`). It locks the request row and then the receipt row, and moves RECORDED → APPROVED exactly once; a repeat is 409. It refreshes the issued quotation's payment status, and runs VERIFY_FUNDS automatically when approved deposits cover the requirement.
+  - `GET /api/fleet-requests/{id}/payment-receipts` and `GET /api/payment-receipts/{id}` (`PAYMENT_RECORD` or `DEPOSIT_REVIEW`).
+- **Clearance:** `POST /api/fleet-requests/{id}/grant-clearance` (`FINANCE_CLEARANCE`) moves FUNDS_VERIFIED → FINANCIALLY_CLEARED.
+- **Audit:** every action writes audit rows with before/after JSON, plus `workflow_history` events.
+- **Config:** `fleet.quotation.validity-days` (30) and `fleet.quotation.default-terms` (placeholder).
+
+### Commands run and real results
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o test-compile` | exit 0 |
+| `./mvnw -o test -Dtest=QuotationCalculatorTest,FinanceApiTest,WorkflowTransitionsTest,MigrationSchemaTest` | **BUILD SUCCESS**: 1024 tests, 0 failures (calculator 19, finance API 11, transitions 986, schema 8) |
+| `./mvnw -q -o verify` | **exit 0**. Surefire totals: **1274 tests, 0 failures, 0 errors**. |
+
+One gap was found and fixed while writing the tests, before any run. Deposits approved *before* issue didn't update the issued quotation's `paymentStatus`, because no ISSUED quotation existed at approval time. Issue now derives it from approved receipts.
+
+**New tests:**
+
+- **`QuotationCalculatorTest` (19):**
+  - FLT-2026-0891 figures: base 6,00,00,000.00, GST 1,08,00,000.00, total 7,08,00,000.00, shortfall 40,00,000.00
+  - HALF_UP at .005 (0.045 → 0.05), and sub-paisa unit prices
+  - per-line rounding before summing (2 × 0.0054 → 0.02, not 0.01)
+  - zero-rated and free lines, a near-max NUMERIC(15,2) total, overflow rejected
+  - shortfall never negative (overpaid, equal, 1 paisa short)
+  - invalid inputs rejected
+- **`FinanceApiTest` (11):**
+  - The draft breakdown, and recalculation replacing the draft.
+  - Issuing is not payment. After issue there are no receipts, the quotation is UNPAID, the request stays PAYMENT_PENDING and clearance gets 409. History reads QUOTATION_CALCULATED → ISSUE_QUOTATION → AWAIT_PAYMENT, the last with the system as actor.
+  - Issuing twice gets 409, and calculating after issue gets 409.
+  - Approvals reach FUNDS_VERIFIED only once DEPOSIT receipts cover 50L (PAYMENT receipts don't count); clearance follows.
+  - Deposits approved before issue verify funds at issue.
+  - A stale draft gets 409.
+  - No GST rate gets 409, and so does the wrong stage.
+  - A duplicate reference gets 409, whatever the case or spacing and on another request too.
+  - Validation 400s, including a future received date.
+  - A double approval gets 409; an unknown receipt gets 404.
+  - With 4 concurrent approvals of one receipt, exactly 1 succeeds and 3 get 409.
+  - ADMIN, MM and MH get 403 on every finance write. MH can read quotations and receipts; MM and ADMIN cannot. SUPERVISOR can issue.
+- **`WorkflowTransitionsTest` (+1):** the finance guards with stubbed facts.
+
+The frontend wasn't touched and the app wasn't started this phase. The finance endpoints are covered by MockMvc tests on Testcontainers postgres:16.
+
+### Known issues / broken
+
+- None blocking.
+- **Business assumption to confirm with Finance:** funds are verified when approved **deposits** ≥ the request's **required deposit**, not the quotation total. See DECISIONS.md.
+- There is no receipt rejection endpoint and no maker-checker rule yet, so the same Finance user may record and approve.
+- The issued quotation snapshot, PDF and verification token are Phase 6.
+- Still outstanding from Phase 2: Supervisor endpoints (cancel, overrides), regions/plants list endpoints, and the client IP on business audit rows.
+
+### Next
+
+Waiting for the next phase prompt. Nothing from later phases has been started.

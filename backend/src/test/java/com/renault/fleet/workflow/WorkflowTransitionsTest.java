@@ -12,8 +12,10 @@ import com.renault.fleet.fleetrequest.entity.FleetRequest;
 import com.renault.fleet.fleetrequest.entity.FleetRequestStatus;
 import com.renault.fleet.user.entity.RoleCode;
 import com.renault.fleet.workflow.entity.WorkflowAction;
+import com.renault.fleet.workflow.service.WorkflowFacts;
 import com.renault.fleet.workflow.service.WorkflowTransitions;
 import com.renault.fleet.workflow.service.WorkflowTransitions.Resolution;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +39,23 @@ class WorkflowTransitionsTest {
     }
 
     private static final List<Row> EXPECTED = expected();
+
+    /** No issued quotation and no approved deposits. */
+    private static final WorkflowFacts NO_FACTS = facts(false, "0");
+
+    private static WorkflowFacts facts(boolean issued, String deposits) {
+        return new WorkflowFacts() {
+            @Override
+            public boolean hasIssuedQuotation(Long requestId) {
+                return issued;
+            }
+
+            @Override
+            public BigDecimal eligibleDeposits(Long requestId) {
+                return new BigDecimal(deposits);
+            }
+        };
+    }
 
     private static List<Row> expected() {
         List<Row> rows = new ArrayList<>(List.of(
@@ -120,9 +139,9 @@ class WorkflowTransitionsTest {
     @Test
     void qualifyRequiresStockMapping() {
         FleetRequest request = new FleetRequest("FLT-2026-0001", null, null, 50, null);
-        assertThat(WorkflowTransitions.available(request, MARKETING_MANAGER)).doesNotContain(WorkflowAction.QUALIFY);
+        assertThat(WorkflowTransitions.available(request, MARKETING_MANAGER, NO_FACTS)).doesNotContain(WorkflowAction.QUALIFY);
         request.markStockMapped(null, Instant.now());
-        assertThat(WorkflowTransitions.available(request, MARKETING_MANAGER)).containsExactly(WorkflowAction.QUALIFY);
+        assertThat(WorkflowTransitions.available(request, MARKETING_MANAGER, NO_FACTS)).containsExactly(WorkflowAction.QUALIFY);
     }
 
     @Test
@@ -130,10 +149,28 @@ class WorkflowTransitionsTest {
         FleetRequest request = new FleetRequest("FLT-2026-0001", null, null, 50, null);
         request.setStatus(FINANCIALLY_CLEARED);
         request.applyAllocation(30);
-        assertThat(WorkflowTransitions.available(request, SUPERVISOR))
+        assertThat(WorkflowTransitions.available(request, SUPERVISOR, NO_FACTS))
                 .contains(WorkflowAction.SCHEDULE_PRODUCTION).doesNotContain(WorkflowAction.SCHEDULE_DISPATCH);
         request.applyAllocation(50);
-        assertThat(WorkflowTransitions.available(request, SUPERVISOR))
+        assertThat(WorkflowTransitions.available(request, SUPERVISOR, NO_FACTS))
                 .contains(WorkflowAction.SCHEDULE_DISPATCH).doesNotContain(WorkflowAction.SCHEDULE_PRODUCTION);
+    }
+
+    @Test
+    void financeGuardsUseIssuedQuotationAndApprovedDeposits() {
+        FleetRequest request = new FleetRequest("FLT-2026-0001", null, null, 50, null);
+        request.setRequiredDeposit(new BigDecimal("5000000.00"));
+        request.setStatus(PENDING_FINANCE_CLEARANCE);
+        assertThat(WorkflowTransitions.available(request, FINANCE_TEAM, NO_FACTS)).doesNotContain(WorkflowAction.ISSUE_QUOTATION);
+        assertThat(WorkflowTransitions.available(request, FINANCE_TEAM, facts(true, "0"))).contains(WorkflowAction.ISSUE_QUOTATION);
+
+        request.setStatus(PAYMENT_PENDING);
+        assertThat(WorkflowTransitions.available(request, FINANCE_TEAM, facts(true, "4999999.99"))).isEmpty();
+        assertThat(WorkflowTransitions.available(request, FINANCE_TEAM, facts(true, "5000000.00")))
+                .containsExactly(WorkflowAction.VERIFY_FUNDS);
+        request.setStatus(FUNDS_VERIFIED);
+        assertThat(WorkflowTransitions.available(request, FINANCE_TEAM, facts(true, "5000000.00")))
+                .containsExactly(WorkflowAction.GRANT_CLEARANCE);
+        assertThat(WorkflowTransitions.available(request, FINANCE_TEAM, facts(true, "100"))).isEmpty();
     }
 }

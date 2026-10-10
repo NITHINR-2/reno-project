@@ -80,6 +80,14 @@ Open http://localhost:5173. The page shows the backend and database health from 
 7. `POST /api/fleet-requests/{id}/approve`, then `POST /api/fleet-requests/{id}/forward-to-finance`. The request is now `PENDING_FINANCE_CLEARANCE`.
 8. `GET /api/fleet-requests/{id}/history` shows each step.
 
+### Finance (Phase 3A), continuing as `finance`
+
+1. `POST /api/fleet-requests/{id}/quotations/calculate` returns a DRAFT: base ₹6,00,00,000.00, GST 18% ₹1,08,00,000.00, total ₹7,08,00,000.00, shortfall ₹40,00,000.00.
+2. `POST /api/quotations/{quotationId}/issue`. The request becomes `PAYMENT_PENDING` and the quotation stays `UNPAID`.
+3. `POST /api/fleet-requests/{id}/payment-receipts` with `{"receiptType":"DEPOSIT","paymentMethod":"RTGS","transactionReference":"UTR-0001","amount":4000000.00,"receivedDate":"<today>"}`.
+4. `POST /api/payment-receipts/{receiptId}/approve`. The deposits now cover ₹50,00,000, so the request becomes `FUNDS_VERIFIED`.
+5. `POST /api/fleet-requests/{id}/grant-clearance`. The request becomes `FINANCIALLY_CLEARED`.
+
 ## Build and test
 
 ```bash
@@ -97,4 +105,4 @@ cd frontend && npm run test -- --run && npm run build && npm run lint
 
 ## Roles
 
-ADMIN, SUPERVISOR, MARKETING_MANAGER, MARKETING_HEAD and FINANCE_TEAM. Roles and permissions are seeded by Flyway (`V6__seed_roles_permissions.sql`) and enforced on the server with `@PreAuthorize`. See `claude.md` for the access matrix and workflow state machine. The marketing and executive stages of the workflow are implemented (Phase 2); finance, production and dispatch follow in later phases.
+ADMIN, SUPERVISOR, MARKETING_MANAGER, MARKETING_HEAD and FINANCE_TEAM. Roles and permissions are seeded by Flyway (`V6__seed_roles_permissions.sql`) and enforced on the server with `@PreAuthorize`. See `claude.md` for the access matrix and workflow state machine. The marketing, executive and finance stages of the workflow are implemented (Phases 2 and 3A); production and dispatch follow in later phases.

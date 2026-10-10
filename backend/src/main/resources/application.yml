@@ -38,6 +38,12 @@ springdoc:
 
 fleet:
   version: "@project.version@"
+  quotation:
+    validity-days: 30
+    # Placeholder terms; Finance owns the final wording.
+    default-terms: >-
+      Prices include GST at the rate shown. This quotation is valid until the date stated.
+      Issuing this quotation is not a receipt of payment. Delivery follows financial clearance.
   security:
     jwt:
       # HS256 signing secret, >= 32 bytes. Required; startup fails without it. Generate: openssl rand -base64 48

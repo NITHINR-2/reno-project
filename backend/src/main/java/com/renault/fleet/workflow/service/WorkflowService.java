@@ -38,16 +38,18 @@ public class WorkflowService {
     private final FleetRequestAuditMapper auditMapper;
     private final StockAllocationService stockAllocations;
     private final FleetRequestDetailAssembler assembler;
+    private final WorkflowFacts facts;
 
     public WorkflowService(FleetRequestRepository requests, WorkflowHistoryService history, AuditService audit,
             FleetRequestAuditMapper auditMapper, StockAllocationService stockAllocations,
-            FleetRequestDetailAssembler assembler) {
+            FleetRequestDetailAssembler assembler, WorkflowFacts facts) {
         this.requests = requests;
         this.history = history;
         this.audit = audit;
         this.auditMapper = auditMapper;
         this.stockAllocations = stockAllocations;
         this.assembler = assembler;
+        this.facts = facts;
     }
 
     @Transactional
@@ -68,7 +70,7 @@ public class WorkflowService {
         if (transition.reasonRequired() && reason == null) {
             throw new BadRequestException(action + " requires a reason.");
         }
-        Optional<String> guardFailure = transition.guard().check(request);
+        Optional<String> guardFailure = transition.guard().check(request, facts);
         if (guardFailure.isPresent()) {
             throw new ConflictException(guardFailure.get());
         }
@@ -77,6 +79,23 @@ public class WorkflowService {
         WorkflowTransitions.automaticFrom(request.getStatus())
                 .ifPresent(auto -> apply(request, auto, null, null));
         return assembler.toDetail(request, actor.role());
+    }
+
+    /**
+     * PAYMENT_PENDING → FUNDS_VERIFIED when approved deposits now cover the required deposit (called after a receipt
+     * approval or a quotation issue). Returns whether the transition happened; does nothing in any other state.
+     */
+    @Transactional
+    public boolean verifyFundsIfCovered(Long requestId, AuthenticatedUser actor) {
+        FleetRequest request = requests.findByIdForUpdate(requestId)
+                .orElseThrow(() -> new NotFoundException("Fleet request " + requestId + " not found."));
+        requests.flush();
+        if (request.getStatus() != FleetRequestStatus.PAYMENT_PENDING
+                || facts.eligibleDeposits(requestId).compareTo(request.getRequiredDeposit()) < 0) {
+            return false;
+        }
+        transition(requestId, WorkflowAction.VERIFY_FUNDS, null, actor);
+        return true;
     }
 
     private void apply(FleetRequest request, Transition transition, String reason, AuthenticatedUser actor) {
