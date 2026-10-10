@@ -59,3 +59,66 @@ Nothing was missing.
 ### Next
 
 Waiting for the Phase 1 prompt. Nothing from later phases has been started.
+
+---
+
+## Phase 1 — Schema, JPA, auth, ProblemDetail, springdoc (2026-10-10) ✅
+
+### New dependencies
+
+`spring-boot-starter-security-oauth2-resource-server` 4.1.1 → Spring Security OAuth2 Resource Server / JOSE 7.1.1, Nimbus JOSE+JWT 10.9.1. No other additions (no Lombok, no jjwt).
+
+### What was done
+
+- **Flyway V2–V6** (V1 unchanged): 20 business tables (the derived list approved by the project owner — see DECISIONS.md) plus `tax_rates` and `refresh_tokens` = 22 tables.
+  - Constraints: PKs, FKs (all indexed), unique business numbers, NOT NULL, enum CHECKs, money/quantity CHECKs, `created_at`/`updated_at`/`version` on mutable tables.
+  - `ux_quotations_one_issued` partial unique index (one ISSUED quotation per request).
+  - `CHECK (quantity_available >= 0)` on stock; case/space-insensitive unique `transaction_reference`; non-overlapping effective-dated `tax_rates` (`EXCLUDE USING gist`, `btree_gist`).
+  - Append-only triggers on `audit_logs` and `workflow_history`.
+  - V6 seeds 5 roles, 21 permissions and the role→permission mapping (all environments).
+- **JPA:** 22 entities + repositories, package-by-feature (`user`, `auth`, `dealer`, `catalog`, `production`, `inventory`, `fleetrequest`, `quotation`, `payment`, `dispatch`, `workflow`, `audit`), shared `BaseEntity`, `ddl-auto=validate` passes.
+- **Auth:**
+  - `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me`.
+  - HS256 access JWT (15 min, memory-only on the client).
+  - Rotating refresh token in a `fleet_rt` cookie: `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`. It is stored as SHA-256, rotation locks the row, and reusing a rotated token revokes the family.
+  - `X-Requested-With` is required on refresh/logout (403 ProblemDetail otherwise).
+  - Authorities (`ROLE_*` + permission codes) are reloaded from the DB on every request.
+  - Method security via `@PreAuthorize`.
+  - Auth events are audited (LOGIN_SUCCESS / LOGIN_FAILED / LOGOUT / REFRESH_TOKEN_REUSE_DETECTED).
+  - `dev`-profile seeding of one user per role (`admin`, `supervisor`, `marketing.manager`, `marketing.head`, `finance`) from `DEV_*_PASSWORD`.
+- **Fleet stub:** `GET /api/fleet-requests` (paginated, `status` filter, `FLEET_REQUEST_READ`), returning a `PageResponse` DTO.
+- **Errors:**
+  - `GlobalExceptionHandler` covers ApiException (incl. 404/409 subclasses), 401, 403, optimistic lock 409, data integrity 409, bad sort 400, validation 400 with an `errors` map, and a catch-all 500.
+  - Security-filter 401/403 are routed through the same handler, so every error is `application/problem+json`.
+- **springdoc:** `bearerAuth` JWT scheme applied globally; auth endpoints opt out.
+- `JWT_SECRET` added to `backend/.env.example`; a generated value was appended to the local, git-ignored `backend/.env`.
+
+### Commands run and real results
+
+| Command | Result |
+|---|---|
+| Migrations V2–V6 applied with `psql -v ON_ERROR_STOP=1` to a scratch DB in `fleet-postgres` | All applied; 22 tables; role permission counts ADMIN 3 / FIN 6 / MH 5 / MM 4 / SUP 21. Scratch DB dropped. |
+| `./mvnw -q verify` (entities only, before auth) | exit 0 — Hibernate `validate` accepted every mapping |
+| `./mvnw verify` (1st full run) | **FAILED**: 37 tests, 2 failures — logout 500 (`LazyInitializationException` on role) and audit-trigger SQLSTATE 42501 being translated as "bad SQL grammar" |
+| Fixes: logout loads user via join-fetch; trigger uses `restrict_violation` (23001) | — |
+| `./mvnw verify` (2nd run) | **BUILD SUCCESS** — Tests run: 37, Failures: 0, Errors: 0 (AuthControllerTest 16, FleetRequestAuthorizationTest 8, MigrationSchemaTest 8, OpenApiTest 2, HealthControllerTest 2, FleetApplicationTests 1) |
+| `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` (compose DB at V1) | Flyway applied V2–V6 ("Successfully applied 5 migrations … now at version v6"); 5 dev users seeded; started in 17.4 s |
+| curl login `marketing.manager` → `/api/auth/me` | 200; role MARKETING_MANAGER with its 4 permissions |
+| curl `/api/fleet-requests` as MARKETING_MANAGER / ADMIN / no token | 200 empty page / **403** ProblemDetail / **401** ProblemDetail |
+| curl refresh without / with `X-Requested-With` | 403 / 200 with `Set-Cookie: fleet_rt=…; Path=/api/auth; Max-Age=604800; Secure; HttpOnly; SameSite=Strict` |
+| curl login with bad password | 401 `Invalid username or password.` |
+| curl `/swagger-ui.html` → `/swagger-ui/index.html`; `/v3/api-docs` | 302 → 200 "Swagger UI"; docs list `/api/auth/{login,logout,me,refresh}`, `/api/fleet-requests`, `/api/health` |
+
+Frontend not touched this phase (no frontend commands run).
+
+### Known issues / broken
+
+- None blocking.
+- `spring-boot:run` via the wrapper leaves the forked JVM running if only the Maven process is killed; stop it with Ctrl+C in a terminal.
+- Expired/revoked `refresh_tokens` rows are never purged yet (cleanup job is a later-phase item).
+- No login rate limiting / lockout yet (only the public verification page is required to be rate-limited, in Phase 6).
+- Business seed data (FLT-2026-0891, dealers, models, plants, inventory, the 18% Duster tax rate) is **not** seeded yet — only users. It belongs with the phase that seeds business data.
+
+### Next
+
+Waiting for the Phase 2 prompt. Nothing from later phases has been started.
