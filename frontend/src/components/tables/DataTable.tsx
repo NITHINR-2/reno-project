@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
@@ -16,7 +17,11 @@ export type Column<T> = {
   className?: string
   /** Shown on the stacked mobile card (default true). The first shown column is the card title. */
   mobile?: boolean
+  /** Server sort property; makes the header a sort button. */
+  sortKey?: string
 }
+
+export type SortState = { key: string; direction: 'asc' | 'desc' }
 
 type DataTableProps<T> = {
   label: string
@@ -31,6 +36,8 @@ type DataTableProps<T> = {
   onRowClick?: (row: T) => void
   emptyTitle?: string
   emptyDescription?: ReactNode
+  sort?: SortState
+  onSortChange?: (sort: SortState) => void
 }
 
 const SKELETON_ROWS = 5
@@ -49,6 +56,8 @@ export function DataTable<T>({
   onRowClick,
   emptyTitle = 'Nothing here yet',
   emptyDescription,
+  sort,
+  onSortChange,
 }: DataTableProps<T>) {
   if (error && !data) {
     return <ErrorState title={`Couldn't load ${label.toLowerCase()}`} error={error} onRetry={onRetry} />
@@ -78,8 +87,17 @@ export function DataTable<T>({
           <thead className="sticky top-0 z-10 bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
             <tr>
               {columns.map((column) => (
-                <th key={column.key} scope="col" className={cn('px-4 py-3 font-semibold', column.className)}>
-                  {column.header}
+                <th
+                  key={column.key}
+                  scope="col"
+                  aria-sort={column.sortKey && sort?.key === column.sortKey ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+                  className={cn('px-4 py-3 font-semibold whitespace-nowrap', column.className)}
+                >
+                  {column.sortKey && onSortChange ? (
+                    <SortButton column={column} sort={sort} onSortChange={onSortChange} />
+                  ) : (
+                    column.header
+                  )}
                 </th>
               ))}
             </tr>
@@ -132,5 +150,20 @@ export function DataTable<T>({
 
       <Pagination page={data.page} size={data.size} totalElements={data.totalElements} totalPages={data.totalPages} onPageChange={onPageChange} />
     </div>
+  )
+}
+
+function SortButton<T>({ column, sort, onSortChange }: { column: Column<T>; sort?: SortState; onSortChange: (sort: SortState) => void }) {
+  const active = sort?.key === column.sortKey
+  const Icon = !active ? ArrowUpDown : sort?.direction === 'asc' ? ArrowUp : ArrowDown
+  return (
+    <button
+      type="button"
+      onClick={() => onSortChange({ key: column.sortKey as string, direction: active && sort?.direction === 'asc' ? 'desc' : 'asc' })}
+      className={cn('-mx-1 inline-flex items-center gap-1 rounded px-1 uppercase tracking-wide hover:text-fg focus-visible:outline-2 focus-visible:outline-accent', active && 'text-fg')}
+    >
+      {column.header}
+      <Icon className="size-3.5" aria-hidden="true" />
+    </button>
   )
 }

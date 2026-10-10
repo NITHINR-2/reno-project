@@ -5,7 +5,7 @@ import type { AuthUser, Role } from '@/features/auth/api'
 type Reply = [status: number, body?: unknown]
 type Handler = (config: InternalAxiosRequestConfig) => Reply | Promise<Reply>
 
-export type Call = { method: string; url: string; headers: AxiosHeaders }
+export type Call = { method: string; url: string; headers: AxiosHeaders; params: Record<string, unknown>; body: unknown }
 
 /** Mirrors V6__roles_permissions.sql. */
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
@@ -32,7 +32,8 @@ export function fakeServer(handlers: Record<string, Handler>) {
     const method = (config.method ?? 'get').toUpperCase()
     const url = config.url ?? ''
     const headers = AxiosHeaders.from(config.headers)
-    calls.push({ method, url, headers })
+    const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
+    calls.push({ method, url, headers, params: (config.params ?? {}) as Record<string, unknown>, body })
     const handler = handlers[`${method} ${url}`]
     const [status, data] = handler ? await handler(config) : [404, { title: 'Not Found', status: 404 }]
     const response: AxiosResponse = { data, status, statusText: String(status), headers: {}, config }

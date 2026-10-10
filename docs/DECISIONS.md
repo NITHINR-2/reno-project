@@ -165,3 +165,19 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **Queries don't retry on 4xx; once on network/5xx.**
 - **Toasts, dialogs, drawer and focus trap are hand-written (no extra UI library); `motion` 14.1.0 is the only new dependency.**
 - **Tests stub HTTP with a custom Axios adapter (`test/fakeServer.ts`), so the real interceptors run** — the refresh logic is exercised, not mocked.
+
+## Phase 5A — Dashboard cards, fleet table, request drawer
+
+- **New `GET /api/fleet-requests/summary` (FLEET_REQUEST_READ), one `GROUP BY status` query; stage buckets are fixed server-side (marketing: review/returned/qualified; executive: pending/approved; finance: clearance/quotation/payment/funds; operations: cleared/production/dispatch)** — the dashboard figures are the backend's, not the browser's.
+- **The six cards are Active, Marketing review, Executive approval, Finance, Production & dispatch, Units to produce (sum of `productionRequired` on non-terminal requests)** — order value needs issued quotations and belongs to the Phase 6 executive dashboard.
+- **Summary is global (not filtered by the table filters)** — cards act as stage shortcuts; clicking one filters the table.
+- **New read endpoints `GET /api/fleet-requests/{id}/production-orders` and `/dispatches` (FLEET_REQUEST_READ, paginated) and `GET /api/regions` (FLEET_REQUEST_READ or ADMIN_DEALERS_MANAGE), `GET /api/plants` (FLEET_REQUEST_READ)** — the Schedule tab and table filters had no data source; read services are separate from the write services.
+- **Fleet modules (Fleet Evaluation, Executive Approval, Finance, Production & Dispatch) share one workspace, each opening on its own stage filter; the user can widen it** — one table implementation, role-appropriate default.
+- **All filters, sort, page and the open request (`?request=<id>`) live in the URL** — views are shareable and survive reload.
+- **Sortable columns use entity property paths the backend already accepts (`requestNumber`, `dealer.name`, `quantity`, `productionRequired`, `requestedDeliveryDate`, `status`, `createdAt`, `updatedAt`); on mobile a Sort select replaces the headers** — unknown sorts are a 400, verified by test.
+- **Drawer tabs are hidden when the user lacks the read permission (Finance: QUOTATION_READ; Payments: PAYMENT_RECORD or DEPOSIT_REVIEW; Audit: AUDIT_LOG_READ, using the existing admin audit search filtered to the request)** — showing them would only produce 403s; no new audit exposure was added.
+- **Editability mirrors the backend: details and stock in PENDING_MARKETING_REVIEW with FLEET_REQUEST_WRITE / STOCK_MAP; quotation calculate/issue in PENDING_FINANCE_CLEARANCE with QUOTATION_ISSUE; receipts in the finance stages with PAYMENT_RECORD / PAYMENT_APPROVE; production/dispatch scheduling only when the server lists the action in `allowedActions`** — scheduling guards (e.g. nothing to produce) are evaluated by the server.
+- **Workflow transitions (qualify, approve, reject, forward, clearance, cancel) are shown as "next steps" only; their buttons are not in 5A.**
+- **Money is sent as decimal strings and only formatted (never calculated) in the browser; dates are shown in IST, `LocalDate` values without time-zone shifting.**
+- **Stock mapping keeps rows this request fully allocated (0 available, so absent from `stock-options`) editable** — otherwise saving would silently release them.
+- **`DataTable` gained optional sortable headers (`sortKey`, `aria-sort`) instead of a new component; feature-local tabs and metric cards live under `features/fleet`** — Phase 5A rule: no new base components.

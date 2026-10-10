@@ -3,6 +3,8 @@ package com.renault.fleet.fleetrequest.controller;
 import com.renault.fleet.common.api.PageResponse;
 import com.renault.fleet.fleetrequest.dto.CreateFleetRequestDto;
 import com.renault.fleet.fleetrequest.dto.FleetRequestDetailDto;
+import com.renault.fleet.fleetrequest.dto.FleetRequestMetricsDto;
+import com.renault.fleet.fleetrequest.service.FleetRequestMetricsService;
 import com.renault.fleet.fleetrequest.dto.FleetRequestFilter;
 import com.renault.fleet.fleetrequest.dto.FleetRequestSummaryDto;
 import com.renault.fleet.fleetrequest.dto.UpdateFleetRequestDto;
@@ -35,9 +37,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class FleetRequestController {
 
     private final FleetRequestService service;
+    private final FleetRequestMetricsService metrics;
 
-    public FleetRequestController(FleetRequestService service) {
+    public FleetRequestController(FleetRequestService service, FleetRequestMetricsService metrics) {
         this.service = service;
+        this.metrics = metrics;
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("hasAuthority('FLEET_REQUEST_READ')")
+    @Operation(summary = "Dashboard summary: requests per stage and units still to produce (computed in SQL)")
+    public FleetRequestMetricsDto summary() {
+        return metrics.summary();
     }
 
     @GetMapping

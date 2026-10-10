@@ -2,6 +2,7 @@ package com.renault.fleet.fleetrequest.repository;
 
 import com.renault.fleet.fleetrequest.entity.FleetRequest;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +29,10 @@ public interface FleetRequestRepository extends JpaRepository<FleetRequest, Long
     Optional<FleetRequest> findByIdForUpdate(@Param("id") Long id);
 
     Optional<FleetRequest> findByRequestNumber(String requestNumber);
+
+    @Query("select r.status as status, count(r) as requests, coalesce(sum(r.productionRequired), 0) as productionUnits"
+            + " from FleetRequest r group by r.status")
+    List<StatusTotals> totalsByStatus();
 
     @Query(value = "select nextval('fleet_request_number_seq')", nativeQuery = true)
     long nextRequestNumber();

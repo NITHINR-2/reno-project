@@ -378,3 +378,22 @@ Waiting for the next phase prompt. Nothing from later phases has been started.
 **Broken / open:** none blocking. Bundle needs route-level code splitting (later). Responsive layouts verified by classes and tests only, not visually at 360/768/1024/1440. Dev role simulator not built (see DECISIONS).
 
 **Next:** waiting for the Phase 5 prompt.
+
+---
+
+## Phase 5A — Dashboard cards, fleet table, request drawer (2026-10-11) ✅
+
+**New dependencies:** none. **Backend:** `GET /api/fleet-requests/summary` (stage counts + units to produce, SQL `GROUP BY`), `GET /api/fleet-requests/{id}/production-orders`, `/dispatches`, `GET /api/regions`, `GET /api/plants`. **Frontend (`features/fleet`):** 6 count-up metric cards (click = stage filter) · fleet table with 10 columns, debounced search, status/stage, region, dealer, model, plant and date filters, sortable headers, server paging, mobile cards + sort select, all state in the URL · drawer (`?request=id`) with tabs Overview, Inventory, Finance, Payments, Workflow, Schedule, Audit, hidden by read permission and editable by role + state (edit details, map stock, calculate/issue quotation, record/approve receipts, schedule production/dispatch). Workspace shared by the four fleet modules, each opening on its stage.
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o test -Dtest=FleetRequestReadApiTest` | 5 tests, 0 failures |
+| `npx vitest --run src/features/fleet` | 1st run 1 failure (test expected "1–2 of 45"; page size is 20 → "1–20"); fixed; 17 passed |
+| `npm test -- --run --reporter=dot` | **8 files, 51 tests passed** |
+| `npm run build` / `npm run lint` | OK (759 kB bundle, chunk-size warning) / 0 findings after fixing 4 warnings |
+| `./mvnw -q -o verify` | **exit 0 — 1291 tests, 0 failures, 0 errors** |
+| Live: dev jar on :8080, curl as supervisor | summary, stage-filtered + `dealer.name` sorted list, regions, plants, production-orders, dispatches, request audit all 200; live JSON parsed by the frontend Zod schemas (throwaway test, removed) |
+
+**Open:** workflow transition buttons, create-request form, Supervisor override/cancel UI are not built (next phase). SLA chips/“at risk” count are Phase 6. Bundle still needs code splitting. Not visually checked at 360/768/1024/1440.
+
+**Next:** waiting for the Phase 5B prompt.
