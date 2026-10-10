@@ -146,3 +146,22 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **Activation endpoints are idempotent: setting the current value returns 200 and writes no audit row.**
 - **Audit search filters: actorId, actorUsername (case-insensitive), action, entityType (case-insensitive), entityId, from/to (IST days, inclusive); newest first; paginated** — read-only over the append-only table.
 - **ADMIN's lack of operational access comes from the permission model (V6) and is proven by a test that sweeps every operational endpoint with a well-formed body** — the 403 must come from authorisation, not body validation.
+
+## Phase 4 — Frontend auth, shell, UI kit
+
+- **Access token in a module variable in `lib/api.ts`, never in storage; on reload the session is restored by calling `/auth/refresh` (cookie) before `/auth/me`** — CLAUDE.md memory-only rule.
+- **Single-flight refresh: concurrent 401s share one refresh promise; across tabs, `navigator.locks` serialises refreshes when available** — a rotated refresh token sent twice would trigger reuse detection and revoke the family.
+- **`X-Requested-With: XMLHttpRequest` is a default header on every API call, not only refresh/logout** — simpler, harmless on other endpoints.
+- **A 401 retries once after refresh; auth endpoints are flagged `skipAuth` and never trigger a refresh; 403 never refreshes** — no loops.
+- **The current user is one TanStack Query (`['auth','me']`, staleTime ∞) and is passed down by `RequireAuth` through context** — children only render while a user exists, so logout can't crash the shell mid-redirect (found by a test).
+- **Ending a session sets `me` to null first, then removes all other cached queries** — no cross-user data survives logout or session expiry.
+- **Navigation, route guards and the post-login landing page share one `NAV_ITEMS` list keyed on permission codes from `/me` (not role names)** — mirrors the backend's permission checks; the server stays the authority.
+- **Unpermitted URLs redirect to `/forbidden` (403 page) with the attempted path; unknown URLs show a not-found page inside the shell.**
+- **Module pages are placeholders in Phase 4; their screens come in later phases.**
+- **Dev role simulator not built** — optional per CLAUDE.md and grants nothing; skipped to keep scope.
+- **Desktop sidebar collapse uses motion `layout` (FLIP transforms) rather than animating width** — honours the transform/opacity-only rule.
+- **Page transitions use `AnimatePresence mode="popLayout"`, so the new page appears immediately while the old one fades** — no animation delays input.
+- **Theme: `system | light | dark` stored in localStorage (UI preference only), applied by an inline script before first paint; semantic colour tokens (`bg-surface`, `text-fg`, …) swap under `.dark`.**
+- **Queries don't retry on 4xx; once on network/5xx.**
+- **Toasts, dialogs, drawer and focus trap are hand-written (no extra UI library); `motion` 14.1.0 is the only new dependency.**
+- **Tests stub HTTP with a custom Axios adapter (`test/fakeServer.ts`), so the real interceptors run** — the refresh logic is exercised, not mocked.

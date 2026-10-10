@@ -360,3 +360,21 @@ The frontend wasn't touched and the app wasn't started this phase. Everything is
 ### Next
 
 Waiting for the next phase prompt. Nothing from later phases has been started.
+
+---
+
+## Phase 4 — Frontend auth, app shell, motion, UI kit (2026-10-11) ✅
+
+**New dependency:** `motion` 14.1.0. **Built:** Axios client (in-memory JWT, single-flight refresh on 401 with cross-tab Web Lock, `X-Requested-With`, session-expired hook) · auth via `/auth/me` query + `RequireAuth` context · login (RHF+Zod) / logout · `AppShell` (animated collapsible sidebar, mobile drawer, top bar with breadcrumbs, user/role, theme toggle, logout) · permission-filtered nav + `RequirePermission` guards + role landing page · 403 / 404 / route-error pages, `ErrorBoundary` per route · toasts (swipe to dismiss) · `src/lib/motion.ts` tokens, `MotionConfig reducedMotion="user"` · UI kit: Button, Badge/StatusBadge, Card, Drawer, Dialog, ConfirmDialog (reason), DataTable (server paging, sticky header, mobile cards), Pagination, Skeleton (shimmer), EmptyState, ErrorState, Form/TextField/SelectField/TextareaField · light/dark theme. Module pages are placeholders.
+
+| Command | Result |
+|---|---|
+| `npx vitest --run src/features/auth` (1st/2nd) | **FAILED**: logout crashed TopBar (user gone before redirect); login never fetched `/me` (`fetchQuery` returned the fresh cached `null`). Fixed: user via `RequireAuth` context; `staleTime: 0`. Also `event.currentTarget` null in async invalid handler. |
+| `npm test -- --run --reporter=dot` | **6 files, 34 tests passed** (auth 3, navigation/guards 15, api client 3, DataTable 8, ConfirmDialog 1, health 2) |
+| `npm run build` | **OK**: `tsc -b` clean; 688 kB (219 kB gzip), Vite >500 kB chunk warning |
+| `npm run lint` | **OK** after splitting hooks from component files (4 warnings → 0) |
+| Live smoke: backend jar `dev` + Vite, curl via `:5173/api` proxy | login 200 → `/me` MARKETING_HEAD with 5 permissions; refresh without header 403, with header 200; logout 204. Headless Edge on `/finance` renders the Sign-in page. Servers stopped. |
+
+**Broken / open:** none blocking. Bundle needs route-level code splitting (later). Responsive layouts verified by classes and tests only, not visually at 360/768/1024/1440. Dev role simulator not built (see DECISIONS).
+
+**Next:** waiting for the Phase 5 prompt.

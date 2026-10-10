@@ -1,0 +1,76 @@
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it } from 'vitest'
+import { fakeServer, sessionHandlers, token, userFor } from '@/test/fakeServer'
+import { renderApp } from '@/test/renderApp'
+
+describe('login and logout', () => {
+  it('sends an anonymous visitor to /login, signs in and returns to the requested page', async () => {
+    const finance = userFor('FINANCE_TEAM')
+    let signedIn = false
+    const server = fakeServer({
+      'POST /auth/refresh': () => [401, { title: 'Unauthorized', status: 401 }],
+      'POST /auth/login': (config) => {
+        const body = JSON.parse(String(config.data)) as { username: string; password: string }
+        if (body.password !== 'correct-horse') return [401, { title: 'Unauthorized', status: 401, detail: 'Invalid username or password.' }]
+        signedIn = true
+        return token('login-token')
+      },
+      'GET /auth/me': () => (signedIn ? [200, finance] : [401, { status: 401 }]),
+    })
+    const user = userEvent.setup()
+    const { router } = renderApp('/finance')
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/login')
+
+    // Client-side validation first.
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByText('Enter your username.')).toBeInTheDocument()
+    expect(server.count('POST /auth/login')).toBe(0)
+
+    await user.type(screen.getByLabelText(/username/i), 'finance')
+    await user.type(screen.getByLabelText(/password/i), 'wrong')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid username or password.')
+
+    await user.clear(screen.getByLabelText(/password/i))
+    await user.type(screen.getByLabelText(/password/i), 'correct-horse')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByRole('heading', { name: 'Financial Clearance', level: 1 })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/finance')
+    expect(screen.getByText('Test FINANCE_TEAM')).toBeInTheDocument()
+
+    // The in-memory token is sent as a bearer header; nothing goes to localStorage.
+    const me = server.calls.filter((c) => c.url === '/auth/me').at(-1)
+    expect(me?.headers.get('Authorization')).toBe('Bearer login-token')
+    expect(JSON.stringify({ ...localStorage })).not.toContain('login-token')
+  })
+
+  it('restores the session from the refresh cookie after a reload', async () => {
+    const server = fakeServer(sessionHandlers(userFor('MARKETING_MANAGER')))
+    renderApp('/')
+
+    expect(await screen.findByRole('heading', { name: 'Fleet Evaluation', level: 1 })).toBeInTheDocument()
+    expect(server.count('POST /auth/refresh')).toBe(1)
+    expect(server.calls.find((c) => c.url === '/auth/refresh')?.headers.get('X-Requested-With')).toBe('XMLHttpRequest')
+  })
+
+  it('signs out: calls logout with X-Requested-With, clears the session and shows the login page', async () => {
+    const server = fakeServer(sessionHandlers(userFor('MARKETING_HEAD')))
+    const user = userEvent.setup()
+    const { router, queryClient } = renderApp('/executive-approval')
+
+    await screen.findByRole('heading', { name: 'Executive Approval', level: 1 })
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/login')
+    const logout = server.calls.find((c) => c.url === '/auth/logout')
+    expect(logout?.method).toBe('POST')
+    expect(logout?.headers.get('X-Requested-With')).toBe('XMLHttpRequest')
+    expect(queryClient.getQueryData(['auth', 'me'])).toBeNull()
+    await waitFor(() => expect(screen.getByText('Signed out')).toBeInTheDocument())
+  })
+})

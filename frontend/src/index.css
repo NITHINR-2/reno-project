@@ -1,9 +1,45 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-accent: #f5c400;
   --color-accent-strong: #d9a900;
   --color-charcoal: #1f2328;
+  --color-charcoal-soft: #2b3036;
+}
+
+/* Semantic surfaces that swap with the theme, so components rarely need `dark:` variants. */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-canvas: var(--canvas);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-accent-fg: var(--accent-fg);
+}
+
+:root {
+  --canvas: #f4f5f7;
+  --surface: #ffffff;
+  --surface-muted: #f0f1f3;
+  --line: #dfe2e6;
+  --fg: #16191d;
+  --fg-muted: #5b636d;
+  --accent-fg: #8a6a00;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: #111316;
+  --surface: #1a1d21;
+  --surface-muted: #23272c;
+  --line: #33383f;
+  --fg: #eceef1;
+  --fg-muted: #a1a9b3;
+  --accent-fg: #f5c400;
+  color-scheme: dark;
 }
 
 html {
@@ -17,5 +53,36 @@ html {
 }
 
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+  @apply bg-canvas text-fg antialiased;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface-muted);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+.dark .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.06), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
 }
