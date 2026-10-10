@@ -1,0 +1,28 @@
+# Secrets — only *.env.example is committed
+.env
+.env.*
+!.env.example
+*.local
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+
+# Java / backend
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
