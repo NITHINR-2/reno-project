@@ -125,3 +125,24 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **Readers: quotations need `QUOTATION_READ` (FIN, MH, SUP); receipts need `PAYMENT_RECORD` or `DEPOSIT_REVIEW`, so the Marketing Head can review deposits.**
 - **Every quotation calculation, issue, receipt record and approval writes an audit row with before/after JSON and a `workflow_history` event (QUOTATION_CALCULATED, RECEIPT_RECORDED, RECEIPT_APPROVED; transitions as usual).**
 - **Finance tests give each world its own vehicle category and GST rate** — tax-rate periods can't overlap per category, and the shared test DB must not collide with `MigrationSchemaTest`'s rolled-back T_SUV rate.
+
+## Phase 3B — Production, dispatch, completion, Admin Console APIs, Supervisor powers
+
+- **Production orders are always for exactly `productionRequired` units at the request's plant (or a given active plant); scheduling runs the workflow transition first** — the NEEDS_PRODUCTION guard gives the clear 409 "No production is required; schedule dispatch instead" before anything is created.
+- **Dispatch is for the full request quantity; scheduled dates can't be in the past (IST)** — one shipment per request for now; split deliveries can come later.
+- **COMPLETE closes everything in the same transaction: production orders COMPLETED, dispatches DELIVERED (dispatched/delivered at completion time), ACTIVE allocations CONSUMED and the stock rows' allocated count reduced (locked in id order)** — the yard units physically leave; available was already reduced at allocation.
+- **Cross-feature side effects of transitions live in `TransitionEffects` (REJECT reason; CANCEL; COMPLETE)** — keeps `WorkflowService` small; same transaction and request lock.
+- **CANCEL also voids open work: DRAFT/ISSUED quotations → CANCELLED, SCHEDULED/IN_PROGRESS production orders and SCHEDULED dispatches → CANCELLED; approved receipts stay recorded** — refunds are out of scope; money records are never deleted.
+- **Override = `POST /{id}/override` with `{reason, version?, changes:{field:value}}`; the allow-list is requiredDeposit, productionEstimateWeeks, requestedDeliveryDate, plantId, notes. Any other key (status, quantity, allocation, production, variant, …) is a 400 naming the field** — overrides can't bypass the workflow, stock locking, tax calculation or duplicate-payment protection.
+- **Override values arrive as strings (`Map<String,String>`), and money is parsed from the literal text with BigDecimal** — a JSON number never passes through `double`.
+- **Overrides work in any non-terminal state (409 when COMPLETED/CANCELLED), write an `OVERRIDE` audit row (before/after JSON, reason) and an `is_override = true` history row (from = to)** — CLAUDE.md audit rule; the database CHECK already requires a reason for override rows.
+- **After an override, funds verification is re-evaluated** — a lowered deposit requirement may already be covered in PAYMENT_PENDING.
+- **Reassign needs a reason and an active non-ADMIN assignee; it is audited (REASSIGN) and recorded in history (REASSIGNED)** — reassigning to someone without fleet access would orphan the request.
+- **Cancel is `POST /{id}/cancel` (`REQUEST_CANCEL`) through the WorkflowService** — one path for state changes.
+- **Only a SUPERVISOR can create, edit, (de)activate or grant the SUPERVISOR role; ADMIN gets 403** — otherwise an ADMIN could create a Supervisor account and gain operational access, which CLAUDE.md denies ADMIN. *Security choice; please confirm.*
+- **Nobody can change their own role or (de)activate themselves (409)** — prevents accidental lock-out and self-escalation.
+- **Deactivation revokes every live refresh token (reason USER_DEACTIVATED); access tokens already stop at the next request because authorities are reloaded from the database** — immediate lock-out.
+- **New-user passwords are 12–128 characters and must not contain the username; they are BCrypt-hashed and never returned, logged or audited** — UserDto has no hash field; audit JSON is built from UserDto.
+- **Activation endpoints are idempotent: setting the current value returns 200 and writes no audit row.**
+- **Audit search filters: actorId, actorUsername (case-insensitive), action, entityType (case-insensitive), entityId, from/to (IST days, inclusive); newest first; paginated** — read-only over the append-only table.
+- **ADMIN's lack of operational access comes from the permission model (V6) and is proven by a test that sweeps every operational endpoint with a well-formed body** — the 403 must come from authorisation, not body validation.

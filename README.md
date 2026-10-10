@@ -105,4 +105,4 @@ cd frontend && npm run test -- --run && npm run build && npm run lint
 
 ## Roles
 
-ADMIN, SUPERVISOR, MARKETING_MANAGER, MARKETING_HEAD and FINANCE_TEAM. Roles and permissions are seeded by Flyway (`V6__seed_roles_permissions.sql`) and enforced on the server with `@PreAuthorize`. See `claude.md` for the access matrix and workflow state machine. The marketing, executive and finance stages of the workflow are implemented (Phases 2 and 3A); production and dispatch follow in later phases.
+ADMIN, SUPERVISOR, MARKETING_MANAGER, MARKETING_HEAD and FINANCE_TEAM. Roles and permissions are seeded by Flyway (`V6__seed_roles_permissions.sql`) and enforced on the server with `@PreAuthorize`. See `claude.md` for the access matrix and workflow state machine. The whole workflow is implemented on the backend: marketing, executive, finance, production, dispatch, completion, and Supervisor override, reassign and cancel. The Admin Console APIs (users, audit log) are under `/api/admin`.

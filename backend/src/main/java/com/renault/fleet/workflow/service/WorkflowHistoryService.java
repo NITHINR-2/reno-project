@@ -32,9 +32,21 @@ public class WorkflowHistoryService {
     @Transactional
     public void record(FleetRequest request, FleetRequestStatus from, FleetRequestStatus to, String action,
             AuthenticatedUser actor, String reason, String metadataJson) {
+        save(request, from, to, action, actor, reason, false, metadataJson);
+    }
+
+    /** Records a Supervisor override (is_override = true; the database requires a reason). */
+    @Transactional
+    public void recordOverride(FleetRequest request, String action, AuthenticatedUser actor, String reason,
+            String metadataJson) {
+        save(request, request.getStatus(), request.getStatus(), action, actor, reason, true, metadataJson);
+    }
+
+    private void save(FleetRequest request, FleetRequestStatus from, FleetRequestStatus to, String action,
+            AuthenticatedUser actor, String reason, boolean override, String metadataJson) {
         User actorRef = actor == null ? null : userRepository.getReferenceById(actor.id());
         String role = actor == null ? null : actor.role().name();
-        repository.save(new WorkflowHistory(request, from, to, action, actorRef, role, reason, false, metadataJson));
+        repository.save(new WorkflowHistory(request, from, to, action, actorRef, role, reason, override, metadataJson));
     }
 
     @Transactional(readOnly = true)

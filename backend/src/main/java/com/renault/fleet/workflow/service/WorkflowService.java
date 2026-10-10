@@ -13,7 +13,6 @@ import com.renault.fleet.fleetrequest.entity.FleetRequestStatus;
 import com.renault.fleet.fleetrequest.mapper.FleetRequestAuditMapper;
 import com.renault.fleet.fleetrequest.repository.FleetRequestRepository;
 import com.renault.fleet.fleetrequest.service.FleetRequestDetailAssembler;
-import com.renault.fleet.inventory.service.StockAllocationService;
 import com.renault.fleet.security.AuthenticatedUser;
 import com.renault.fleet.workflow.entity.WorkflowAction;
 import com.renault.fleet.workflow.service.WorkflowTransitions.Resolution;
@@ -36,18 +35,18 @@ public class WorkflowService {
     private final WorkflowHistoryService history;
     private final AuditService audit;
     private final FleetRequestAuditMapper auditMapper;
-    private final StockAllocationService stockAllocations;
+    private final TransitionEffects effects;
     private final FleetRequestDetailAssembler assembler;
     private final WorkflowFacts facts;
 
     public WorkflowService(FleetRequestRepository requests, WorkflowHistoryService history, AuditService audit,
-            FleetRequestAuditMapper auditMapper, StockAllocationService stockAllocations,
+            FleetRequestAuditMapper auditMapper, TransitionEffects effects,
             FleetRequestDetailAssembler assembler, WorkflowFacts facts) {
         this.requests = requests;
         this.history = history;
         this.audit = audit;
         this.auditMapper = auditMapper;
-        this.stockAllocations = stockAllocations;
+        this.effects = effects;
         this.assembler = assembler;
         this.facts = facts;
     }
@@ -101,17 +100,8 @@ public class WorkflowService {
     private void apply(FleetRequest request, Transition transition, String reason, AuthenticatedUser actor) {
         String before = auditMapper.json(request);
         FleetRequestStatus from = request.getStatus();
-        String metadata = null;
-        switch (transition.action()) {
-            case REJECT -> request.setReturnReason(reason);
-            case CANCEL -> {
-                request.setCancelReason(reason);
-                int released = stockAllocations.releaseAll(request);
-                metadata = auditMapper.toJson(Map.of("releasedUnits", released));
-            }
-            default -> {
-            }
-        }
+        Map<String, Object> effects = this.effects.apply(request, transition.action(), reason);
+        String metadata = effects.isEmpty() ? null : auditMapper.toJson(effects);
         request.setStatus(transition.to());
         requests.flush();
 

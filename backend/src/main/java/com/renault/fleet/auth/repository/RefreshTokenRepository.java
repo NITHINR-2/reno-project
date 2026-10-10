@@ -32,4 +32,13 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     int revokeFamily(@Param("familyId") UUID familyId, @Param("reason") RevokeReason reason, @Param("now") Instant now);
 
     List<RefreshToken> findByFamilyId(UUID familyId);
+
+    /** Revokes every live token of a user (deactivation). Doesn't clear the persistence context. */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update RefreshToken t
+               set t.revokedAt = :now, t.revokeReason = :reason, t.updatedAt = :now, t.version = t.version + 1
+             where t.user.id = :userId and t.revokedAt is null
+            """)
+    int revokeAllForUser(@Param("userId") Long userId, @Param("reason") RevokeReason reason, @Param("now") Instant now);
 }

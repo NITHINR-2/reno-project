@@ -133,6 +133,25 @@ public class StockAllocationService {
         return released;
     }
 
+    /**
+     * On completion the allocated vehicles leave the yard: active allocations become CONSUMED and the stock rows'
+     * allocated count drops (available was already reduced at allocation). Caller holds the request lock.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public int consumeAll(FleetRequest request) {
+        Map<Long, InventoryStock> locked = lockInOrder(new TreeSet<>(allocations.findActiveStockIds(request.getId())));
+        int consumed = 0;
+        for (StockAllocation allocation : allocations.findByFleetRequestIdAndStatusOrderById(request.getId(),
+                AllocationStatus.ACTIVE)) {
+            InventoryStock row = locked.get(allocation.getStock().getId());
+            row.setQuantityAllocated(row.getQuantityAllocated() - allocation.getQuantity());
+            allocation.setStatus(AllocationStatus.CONSUMED);
+            consumed += allocation.getQuantity();
+        }
+        allocations.flush();
+        return consumed;
+    }
+
     private int release(Long requestId, Map<Long, InventoryStock> locked, Instant now) {
         List<StockAllocation> active = allocations.findByFleetRequestIdAndStatusOrderById(requestId, AllocationStatus.ACTIVE);
         int released = 0;

@@ -295,3 +295,68 @@ The frontend wasn't touched and the app wasn't started this phase. The finance e
 ### Next
 
 Waiting for the next phase prompt. Nothing from later phases has been started.
+
+---
+
+## Phase 3B — Production, dispatch, completion, Admin Console APIs, Supervisor powers (2026-10-11) ✅
+
+### New dependencies
+
+None.
+
+### What was done
+
+- **Flyway V9:** `production_number_seq` and `dispatch_number_seq` (PRD-/DSP-<year>-<n>).
+- **Production and dispatch:**
+  - `POST /api/fleet-requests/{id}/schedule-production` (`PRODUCTION_SCHEDULE`): a production order for `productionRequired` units. It returns 409 when nothing needs producing.
+  - `POST /api/fleet-requests/{id}/schedule-dispatch` (`DISPATCH_SCHEDULE`): from PRODUCTION_SCHEDULED, or from FINANCIALLY_CLEARED when `productionRequired = 0`.
+  - `POST /api/fleet-requests/{id}/complete` (`DISPATCH_SCHEDULED` → COMPLETED): orders COMPLETED, dispatch DELIVERED, allocations CONSUMED, stock `allocated` reduced.
+- **Supervisor:**
+  - `POST /api/fleet-requests/{id}/override` (`WORKFLOW_OVERRIDE`): allow-listed fields, reason required, before/after audit, `is_override` history row.
+  - `POST /api/fleet-requests/{id}/reassign` (`REQUEST_REASSIGN`): reason required.
+  - `POST /api/fleet-requests/{id}/cancel` (`REQUEST_CANCEL`): releases stock and voids open quotations, orders and dispatches.
+- **Admin Console:**
+  - `/api/admin/users` (`ADMIN_USERS_MANAGE`): list/filter, get, create, patch, activate, deactivate. Deactivating revokes refresh tokens. Only SUPERVISOR manages SUPERVISOR accounts, and no self role change or self (de)activation.
+  - `GET /api/admin/audit-logs` (`AUDIT_LOG_READ`): filter by actor, action, entity and date range.
+- **Refactor:** `TransitionEffects` now holds the transition side effects (reject, cancel, complete). `WorkflowHistoryService.recordOverride` writes `is_override` rows. `StockAllocationService.consumeAll`.
+
+### Commands run and real results
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o compile` / `test-compile` | exit 0 |
+| `./mvnw -q -o test -Dtest=OperationsAndSupervisorApiTest,AdminApiTest,MigrationSchemaTest` | **FAILED**: 3 test-side failures. Login events are also audited against entity USER, so the admin assertions needed filtering. One 403 check sent a body with the wrong shape, so validation answered 400 first (the documented ordering). |
+| Re-run of those two classes after fixing the tests | exit 0 |
+| `./mvnw -q -o verify` | **exit 1**: 1286 tests, 1 failure. The happy-path history assertion read an unsorted page, so the row order depended on the database. |
+| Fix: explicit `createdAt, id` sort; re-run of the class | exit 0 |
+| `./mvnw -q -o verify` (final) | **exit 0**. Surefire totals: **1286 tests, 0 failures, 0 errors**. |
+
+**New tests:**
+- **`OperationsAndSupervisorApiTest` (7):**
+  - **Full happy path over HTTP, creation → COMPLETED.** It covers create → map 30/50 → qualify → forward → approve → forward → calculate → issue → deposit → approve (FUNDS_VERIFIED) → clearance. Dispatch before production gives 409. Then production (20 units), dispatch (50 units) and complete. Afterwards the order is COMPLETED, the dispatch DELIVERED, the stock shows allocated 0 and the allocation is CONSUMED. History has all 13 steps in order, and a later cancel gives 409.
+  - Production skipped when everything comes from stock: 409, no order, then dispatch directly and complete.
+  - Scheduling 403 for ADMIN, MM, MH and FIN; a past date gives 400.
+  - **Override without a reason gives 400**, and so do non-allow-listed fields (status, quantity, allocatedQty, productionRequired, variantId), empty changes and a negative deposit. None of them write an audit row.
+  - **Override audited:** the OVERRIDE row has the reason and before/after `requiredDeposit`, and history has `is_override=true`. Fleet roles and ADMIN get 403; a closed request gets 409.
+  - **Cancel releases stock:** 30 units back to available, allocation RELEASED, `WORKFLOW_CANCEL` audited. No reason gives 400, other roles get 403, and a repeat gives 409.
+  - Reassign: no reason gives 400, an ADMIN assignee gives 409, MH gets 403, and a success is audited.
+- **`AdminApiTest` (5):**
+  - **ADMIN gets 403 on all 31 operational endpoints** (sent with well-formed bodies), while `/api/admin/users`, `/api/admin/audit-logs` and `/api/dealers` return 200.
+  - User CRUD: the password is never returned or audited and the user can log in. A bad username, weak password or duplicate is rejected, and a stale version gives 409.
+  - Deactivation: the access token gets 401 immediately, refresh gets 401 and login gets 401; reactivation restores access.
+  - ADMIN can't create, promote or deactivate a SUPERVISOR (403); self-deactivation and a self role change give 409; SUPERVISOR can create a SUPERVISOR. MM gets 403 on the Admin Console.
+  - Audit search by entity, actor, action and date.
+
+The frontend wasn't touched and the app wasn't started this phase. Everything is covered by MockMvc tests on Testcontainers postgres:16.
+
+### Known issues / broken
+
+- None blocking.
+- **To confirm:** only SUPERVISOR can manage SUPERVISOR accounts (ADMIN gets 403). This is a security choice; see DECISIONS.md.
+- **Still to confirm with Finance (from 3A):** funds are verified on approved deposits ≥ required deposit.
+- No password reset/change endpoint yet, no receipt rejection, and no maker-checker rule.
+- Regions/plants list endpoints and the client IP on business audit rows are still outstanding.
+
+### Next
+
+Waiting for the next phase prompt. Nothing from later phases has been started.

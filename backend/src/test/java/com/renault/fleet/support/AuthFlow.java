@@ -36,7 +36,11 @@ public final class AuthFlow {
     }
 
     public static Session loginOk(MockMvc mockMvc, String username) throws Exception {
-        return session(login(mockMvc, username, TestUsers.PASSWORD).andReturn().getResponse());
+        return loginOk(mockMvc, username, TestUsers.PASSWORD);
+    }
+
+    public static Session loginOk(MockMvc mockMvc, String username, String password) throws Exception {
+        return session(login(mockMvc, username, password).andReturn().getResponse());
     }
 
     public static ResultActions refresh(MockMvc mockMvc, String refreshToken) throws Exception {
