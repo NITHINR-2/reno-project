@@ -18,5 +18,12 @@ public record FleetRequestMetricsDto(
         long unitsToProduce,
         long completed,
         long cancelled,
-        Map<FleetRequestStatus, Long> byStatus) {
+        Map<FleetRequestStatus, Long> byStatus,
+        long slaAtRisk,
+        long slaBreached,
+        /** Keyed by stage bucket: marketing, executive, finance, operations. */
+        Map<String, SlaCounts> slaByStage) {
+
+    public record SlaCounts(long atRisk, long breached) {
+    }
 }

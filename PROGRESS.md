@@ -434,3 +434,23 @@ Waiting for the next phase prompt. Nothing from later phases has been started.
 **Open:** Supervisor reassign UI; create-request form; password reset; SLA and dashboard (Phase 6); bundle splitting; visual check at 360–1440 px.
 
 **Next:** waiting for the next phase prompt.
+
+---
+
+## Phase 6A — SLA timers (2026-10-11) ✅
+
+**New dependencies:** none. **Backend:** V10 `sla_policies` (7 default stages, 75 % warning) + stage clock columns on `fleet_requests` (backfilled) + one-breach-per-entry unique index; `SlaService.enterStage` on every transition and create; `slaStatus` in list/detail, `sla=` filter, SLA counts in the summary; `SlaBreachJob` (5 min, conditional claim, system `SLA_BREACHED` history event); `GET/PATCH /api/admin/sla-policies` (Supervisor, audited). **Frontend:** SLA chip (server colour, client countdown, pulse when overdue) in table, drawer title and Overview; SLA filter with "Overdue"; per-module "N at risk · M overdue" button; minute refetch; Admin Console **SLA** tab (Supervisor only) with validated edit form.
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o test -Dtest=MigrationSchemaTest,…` | 1 failure: expected migration v9 / 22 tables → updated to v10 / 23 |
+| `./mvnw -q -o test -Dtest=SlaClockTest,SlaApiTest` | 1st: 1 test-side failure (asserted an empty actor list; the row's actor is `null`, as intended); fixed → **16 passed** |
+| `npm test -- --run` (during work) | 1 fixture failure (summary fixture lacked SLA fields — strict schema), 2 test-side fixes (timer advanced twice; cached query not refetched) |
+| `npm test -- --run --reporter=dot` | **13 files, 112 tests passed** |
+| `npm run lint` / `npm run build` / `tsc -b` | 0 findings / OK / clean |
+| `./mvnw -q -o verify` | **exit 0 — 1308 tests, 0 failures, 0 errors** |
+| Live: `pg_dump` of the dev DB (v9) → scratch DB + one open request entered PAYMENT_PENDING 200 h ago; jar on :18080, scan every 10 s | V10 applied; backfill dated the stage from the AWAIT_PAYMENT row, due +168 h; the real scheduler recorded **one** SLA_BREACHED (no actor, frozen times) and later scans none; `?sla=BREACHED` returned it, summary finance breached 1; live JSON parsed by the frontend schemas. Scratch DB dropped; dev DB untouched (still v9 — V10 applies on your next backend start). |
+
+**Open:** your running backend on :8080 is the old build — restart it to apply V10. Business-hours SLA and pausing are out of scope. Dashboard (6B/6C), quotation PDF, bundle splitting, visual check at 360–1440 px remain.
+
+**Next:** waiting for the next phase prompt.

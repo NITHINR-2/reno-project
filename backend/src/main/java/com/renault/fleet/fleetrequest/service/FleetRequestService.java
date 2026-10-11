@@ -26,6 +26,7 @@ import com.renault.fleet.inventory.service.StockAllocationService;
 import com.renault.fleet.production.entity.Plant;
 import com.renault.fleet.production.repository.PlantRepository;
 import com.renault.fleet.security.AuthenticatedUser;
+import com.renault.fleet.sla.service.SlaService;
 import com.renault.fleet.user.repository.UserRepository;
 import com.renault.fleet.workflow.dto.WorkflowHistoryDto;
 import com.renault.fleet.workflow.service.WorkflowHistoryService;
@@ -55,12 +56,13 @@ public class FleetRequestService {
     private final FleetRequestAuditMapper auditMapper;
     private final FleetRequestDetailAssembler assembler;
     private final Clock clock;
+    private final SlaService sla;
 
     public FleetRequestService(FleetRequestRepository repository, DealerRepository dealers,
             VehicleVariantRepository variants, PlantRepository plants, UserRepository users,
             StockAllocationService stockAllocations, WorkflowHistoryService history, AuditService audit,
             FleetRequestMapper mapper, FleetRequestAuditMapper auditMapper, FleetRequestDetailAssembler assembler,
-            Clock clock) {
+            Clock clock, SlaService sla) {
         this.repository = repository;
         this.dealers = dealers;
         this.variants = variants;
@@ -73,11 +75,12 @@ public class FleetRequestService {
         this.auditMapper = auditMapper;
         this.assembler = assembler;
         this.clock = clock;
+        this.sla = sla;
     }
 
     @Transactional(readOnly = true)
     public PageResponse<FleetRequestSummaryDto> list(FleetRequestFilter filter, Pageable pageable) {
-        return PageResponse.from(repository.findAll(FleetRequestSpecifications.from(filter), pageable), mapper::toSummary);
+        return PageResponse.from(repository.findAll(FleetRequestSpecifications.from(filter, clock.instant()), pageable), mapper::toSummary);
     }
 
     @Transactional(readOnly = true)
@@ -108,6 +111,7 @@ public class FleetRequestService {
         request.setProductionEstimateWeeks(dto.productionEstimateWeeks());
         request.setRequestedDeliveryDate(dto.requestedDeliveryDate());
         request.setNotes(dto.notes());
+        sla.enterStage(request);
         repository.saveAndFlush(request);
 
         history.record(request, null, request.getStatus(), CREATED, actor, null, null);

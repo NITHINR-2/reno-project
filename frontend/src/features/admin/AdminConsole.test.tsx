@@ -39,6 +39,10 @@ function adminServer(role: Role, extra: Handlers = {}) {
     'GET /dealers': () => [200, page([DEALER])],
     'GET /admin/audit-logs': () => [200, page([AUDIT])],
     'GET /regions': () => [200, page([{ id: 1, name: 'Chennai Region' }])],
+    'GET /admin/sla-policies': () => [200, page([
+      { id: 1, stage: 'PENDING_MARKETING_REVIEW', hoursAllowed: 48, warningThresholdPct: 75, active: true, version: 0, updatedAt: null },
+      { id: 5, stage: 'PAYMENT_PENDING', hoursAllowed: 168, warningThresholdPct: 75, active: true, version: 2, updatedAt: null },
+    ])],
     ...extra,
   })
 }
@@ -232,5 +236,54 @@ describe('roles, dealers and audit log', () => {
     expect(drawer).toHaveTextContent('10.0.0.5')
     expect(drawer).toHaveTextContent('"requiredDeposit": 5000000')
     expect(drawer).toHaveTextContent('"requiredDeposit": 4000000')
+  })
+})
+
+describe('SLA policies', () => {
+  it('only a Supervisor gets the SLA tab', async () => {
+    adminServer('ADMIN')
+    const { unmount } = renderApp('/admin?tab=sla')
+    await screen.findByRole('table', { name: 'Users' })
+    expect(screen.queryByRole('tab', { name: 'SLA' })).not.toBeInTheDocument()
+    unmount()
+
+    adminServer('SUPERVISOR')
+    renderApp('/admin?tab=sla')
+    const table = await screen.findByRole('table', { name: 'SLA policies' })
+    const rows = within(table).getAllByRole('row')
+    expect(rows[1]).toHaveTextContent('Pending marketing review48h75% (36h)Active')
+    expect(rows[2]).toHaveTextContent('Payment pending168h75% (126h)Active')
+  })
+
+  it('validates and saves a policy with its version', async () => {
+    const server = adminServer('SUPERVISOR', {
+      'PATCH /admin/sla-policies/5': () => [200, { id: 5, stage: 'PAYMENT_PENDING', hoursAllowed: 120, warningThresholdPct: 80, active: true, version: 3, updatedAt: null }],
+    })
+    const u = userEvent.setup()
+    renderApp('/admin?tab=sla')
+    await u.click(within(await screen.findByRole('table', { name: 'SLA policies' })).getByText('Payment pending'))
+    const form = await screen.findByRole('form', { name: 'Edit SLA policy' })
+
+    const hours = within(form).getByLabelText(/Hours allowed/)
+    const pct = within(form).getByLabelText(/At risk from/)
+    await u.clear(hours)
+    await u.type(hours, '0')
+    await u.clear(pct)
+    await u.type(pct, '100')
+    await u.click(within(form).getByRole('button', { name: 'Save policy' }))
+    expect(await within(form).findByText('Between 1 and 8,760 hours.')).toBeInTheDocument()
+    expect(within(form).getByText('Between 1 and 99%.')).toBeInTheDocument()
+    expect(server.calls.some((c) => c.method === 'PATCH')).toBe(false)
+
+    await u.clear(hours)
+    await u.type(hours, '120')
+    await u.clear(pct)
+    await u.type(pct, '80')
+    expect(within(form).getByText('At risk after 96h, overdue after 120h.')).toBeInTheDocument()
+    await u.click(within(form).getByRole('button', { name: 'Save policy' }))
+    await waitFor(() =>
+      expect(server.calls.find((c) => c.method === 'PATCH')?.body).toEqual({ version: 2, hoursAllowed: 120, warningThresholdPct: 80, active: true }),
+    )
+    expect(await toast('SLA policy updated')).toBeInTheDocument()
   })
 })

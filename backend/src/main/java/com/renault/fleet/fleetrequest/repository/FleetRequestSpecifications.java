@@ -2,6 +2,12 @@ package com.renault.fleet.fleetrequest.repository;
 
 import com.renault.fleet.fleetrequest.dto.FleetRequestFilter;
 import com.renault.fleet.fleetrequest.entity.FleetRequest;
+import com.renault.fleet.sla.entity.SlaStatus;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -17,7 +23,7 @@ public final class FleetRequestSpecifications {
     private FleetRequestSpecifications() {
     }
 
-    public static Specification<FleetRequest> from(FleetRequestFilter f) {
+    public static Specification<FleetRequest> from(FleetRequestFilter f, Instant now) {
         List<Specification<FleetRequest>> specs = new ArrayList<>();
         if (f.status() != null && !f.status().isEmpty()) {
             specs.add((root, query, cb) -> root.get("status").in(f.status()));
@@ -49,7 +55,21 @@ public final class FleetRequestSpecifications {
         if (f.createdTo() != null) {
             specs.add((root, query, cb) -> cb.lessThan(root.get("createdAt"), startOf(f.createdTo().plusDays(1))));
         }
+        if (f.sla() != null && !f.sla().isEmpty()) {
+            specs.add((root, query, cb) -> cb.or(f.sla().stream().map(s -> sla(s, root, cb, now)).toArray(Predicate[]::new)));
+        }
         return Specification.allOf(specs);
+    }
+
+    /** Same boundaries as {@code SlaClock.status}: due ≤ now is BREACHED, warning ≤ now < due is AT_RISK. */
+    private static Predicate sla(SlaStatus status, Root<FleetRequest> root, CriteriaBuilder cb, Instant now) {
+        Path<Instant> due = root.get("slaDueAt");
+        Path<Instant> warning = root.get("slaWarningAt");
+        return switch (status) {
+            case BREACHED -> cb.lessThanOrEqualTo(due, now);
+            case AT_RISK -> cb.and(cb.lessThanOrEqualTo(warning, now), cb.greaterThan(due, now));
+            case ON_TRACK -> cb.greaterThan(warning, now);
+        };
     }
 
     private static java.time.Instant startOf(LocalDate day) {

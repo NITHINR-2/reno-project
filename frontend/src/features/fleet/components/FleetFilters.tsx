@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { statusLabel } from '@/lib/format'
 import { STATUSES, type Ref } from '../api'
 import { STAGES, type FilterKey } from '../filters'
+import { SLA_FILTERS } from '../sla'
 import { useReferenceData } from '../queries'
 
 const SEARCH_DEBOUNCE_MS = 300
@@ -17,6 +18,7 @@ const SORT_OPTIONS = [
   { value: 'requestedDeliveryDate,asc', label: 'Delivery date' },
   { value: 'quantity,desc', label: 'Largest quantity' },
   { value: 'dealer.name,asc', label: 'Dealer A–Z' },
+  { value: 'slaDueAt,asc', label: 'SLA due soonest' },
 ]
 
 type FleetFiltersProps = {
@@ -108,6 +110,18 @@ export function FleetFilters({ values, sort, onChange, onSortChange, onClear }: 
                   </option>
                 ))}
               </optgroup>
+            </select>
+          )}
+        </Labeled>
+        <Labeled label="SLA" className="sm:w-48">
+          {(id) => (
+            <select id={id} value={values.sla} onChange={(e) => onChange('sla', e.target.value)} className={inputClass}>
+              <option value="">Any SLA</option>
+              {SLA_FILTERS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           )}
         </Labeled>

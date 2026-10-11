@@ -29,3 +29,14 @@ export function formatDateTime(value: string | null | undefined) {
 export function todayIST() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: IST }).format(new Date())
 }
+
+/** 45m · 18h · 2d 4h — a compact span for SLA countdowns (whole minutes, rounded down). */
+export function formatSpan(ms: number) {
+  const minutes = Math.floor(Math.abs(ms) / 60_000)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 48) return `${hours}h`
+  const days = Math.floor(hours / 24)
+  const rest = hours % 24
+  return rest ? `${days}d ${rest}h` : `${days}d`
+}

@@ -86,3 +86,20 @@ body {
     animation: none;
   }
 }
+
+/* Gentle pulse for overdue SLA chips: opacity only, and none with reduced motion. */
+@keyframes sla-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.sla-pulse {
+  animation: sla-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sla-pulse {
+    animation: none;
+  }
+}

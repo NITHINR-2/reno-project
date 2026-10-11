@@ -16,13 +16,17 @@ import static com.renault.fleet.fleetrequest.entity.FleetRequestStatus.QUOTATION
 import static com.renault.fleet.fleetrequest.entity.FleetRequestStatus.RETURNED_TO_MARKETING;
 
 import com.renault.fleet.fleetrequest.dto.FleetRequestMetricsDto;
+import com.renault.fleet.fleetrequest.dto.FleetRequestMetricsDto.SlaCounts;
 import com.renault.fleet.fleetrequest.entity.FleetRequestStatus;
 import com.renault.fleet.fleetrequest.repository.FleetRequestRepository;
+import com.renault.fleet.fleetrequest.repository.SlaTotals;
 import com.renault.fleet.fleetrequest.repository.StatusTotals;
+import java.time.Clock;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,10 +42,15 @@ public class FleetRequestMetricsService {
             EnumSet.of(FINANCIALLY_CLEARED, PRODUCTION_SCHEDULED, DISPATCH_SCHEDULED);
     static final Set<FleetRequestStatus> TERMINAL = EnumSet.of(COMPLETED, CANCELLED);
 
-    private final FleetRequestRepository repository;
+    static final Map<String, Set<FleetRequestStatus>> BUCKETS = Map.of(
+            "marketing", MARKETING, "executive", EXECUTIVE, "finance", FINANCE, "operations", OPERATIONS);
 
-    public FleetRequestMetricsService(FleetRequestRepository repository) {
+    private final FleetRequestRepository repository;
+    private final Clock clock;
+
+    public FleetRequestMetricsService(FleetRequestRepository repository, Clock clock) {
         this.repository = repository;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -58,6 +67,20 @@ public class FleetRequestMetricsService {
                 unitsToProduce += row.getProductionUnits();
             }
         }
+        Map<String, SlaCounts> slaByStage = new TreeMap<>();
+        BUCKETS.keySet().forEach(bucket -> slaByStage.put(bucket, new SlaCounts(0, 0)));
+        long atRisk = 0;
+        long breached = 0;
+        for (SlaTotals row : repository.slaTotalsByStatus(clock.instant())) {
+            atRisk += row.getAtRisk();
+            breached += row.getBreached();
+            BUCKETS.forEach((bucket, statuses) -> {
+                if (statuses.contains(row.getStatus())) {
+                    SlaCounts c = slaByStage.get(bucket);
+                    slaByStage.put(bucket, new SlaCounts(c.atRisk() + row.getAtRisk(), c.breached() + row.getBreached()));
+                }
+            });
+        }
         return new FleetRequestMetricsDto(
                 sum(byStatus, EnumSet.complementOf(EnumSet.copyOf(TERMINAL))),
                 sum(byStatus, MARKETING),
@@ -67,7 +90,10 @@ public class FleetRequestMetricsService {
                 unitsToProduce,
                 byStatus.get(COMPLETED),
                 byStatus.get(CANCELLED),
-                byStatus);
+                byStatus,
+                atRisk,
+                breached,
+                slaByStage);
     }
 
     private static long sum(Map<FleetRequestStatus, Long> byStatus, Set<FleetRequestStatus> statuses) {

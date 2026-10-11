@@ -16,7 +16,7 @@ export type Stage = keyof typeof STAGES
 export const PAGE_SIZE = 20
 export const DEFAULT_SORT: SortState = { key: 'createdAt', direction: 'desc' }
 
-const FILTER_KEYS = ['q', 'status', 'regionId', 'dealerId', 'modelId', 'plantId', 'createdFrom', 'createdTo'] as const
+const FILTER_KEYS = ['q', 'status', 'sla', 'regionId', 'dealerId', 'modelId', 'plantId', 'createdFrom', 'createdTo'] as const
 export type FilterKey = (typeof FILTER_KEYS)[number]
 
 /**
@@ -48,6 +48,7 @@ export function useFleetFilters(defaultStage?: Stage) {
       plantId: value('plantId'),
       createdFrom: value('createdFrom'),
       createdTo: value('createdTo'),
+      sla: value('sla')?.split(','),
     }
   }, [params, page, sort.key, sort.direction, status])
 

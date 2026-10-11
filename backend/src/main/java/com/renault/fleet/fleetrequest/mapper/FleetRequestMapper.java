@@ -13,12 +13,19 @@ import com.renault.fleet.inventory.dto.StockAllocationDto;
 import com.renault.fleet.production.entity.Plant;
 import com.renault.fleet.user.entity.User;
 import com.renault.fleet.workflow.entity.WorkflowAction;
+import com.renault.fleet.sla.service.SlaService;
 import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
 public class FleetRequestMapper {
+
+    private final SlaService sla;
+
+    public FleetRequestMapper(SlaService sla) {
+        this.sla = sla;
+    }
 
     /** Expects dealer (+region), variant (+model) and plant to be fetched (see the repository's entity graphs). */
     public FleetRequestSummaryDto toSummary(FleetRequest request) {
@@ -37,6 +44,9 @@ public class FleetRequestMapper {
                 request.getProductionRequired(),
                 request.getRequestedDeliveryDate(),
                 request.getStatus(),
+                request.getStageEnteredAt(),
+                request.getSlaDueAt(),
+                sla.statusOf(request),
                 request.getVersion(),
                 request.getCreatedAt(),
                 request.getUpdatedAt());
@@ -51,6 +61,10 @@ public class FleetRequestMapper {
                 r.getId(),
                 r.getRequestNumber(),
                 r.getStatus(),
+                r.getStageEnteredAt(),
+                r.getSlaWarningAt(),
+                r.getSlaDueAt(),
+                sla.statusOf(r),
                 new DealerRef(dealer.getId(), dealer.getDealerCode(), dealer.getName(), dealer.getRegion().getId(),
                         dealer.getRegion().getName()),
                 new VariantRef(variant.getId(), variant.getCode(), variant.getName(), variant.getModel().getId(),

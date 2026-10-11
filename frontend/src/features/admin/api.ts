@@ -62,6 +62,18 @@ export const auditLogSchema = z.object({
 })
 export type AuditLog = z.infer<typeof auditLogSchema>
 
+export const slaPolicySchema = z.object({
+  id: z.number(),
+  stage: z.string(),
+  hoursAllowed: z.number(),
+  warningThresholdPct: z.number(),
+  active: z.boolean(),
+  version: z.number(),
+  updatedAt: z.string().nullish(),
+})
+export type SlaPolicy = z.infer<typeof slaPolicySchema>
+export type SlaPolicyBody = { version: number; hoursAllowed: number; warningThresholdPct: number; active: boolean }
+
 const regionSchema = z.object({ id: z.number(), name: z.string() })
 
 export type UserQuery = { page: number; q?: string; role?: string; active?: string }
@@ -99,6 +111,9 @@ export const adminApi = {
   dealers: (q: DealerQuery) => getPage('/dealers', dealerSchema, { size: 20, sort: 'name', ...q }),
   auditLogs: (q: AuditQuery) => getPage('/admin/audit-logs', auditLogSchema, { size: 20, ...q }),
   regions: () => getPage('/regions', regionSchema, { size: 100 }),
+  slaPolicies: () => getPage('/admin/sla-policies', slaPolicySchema, { size: 20, sort: 'id' }),
+  updateSlaPolicy: async (id: number, body: SlaPolicyBody) =>
+    slaPolicySchema.parse((await api.patch<unknown>(`/admin/sla-policies/${id}`, body)).data),
 
   createUser: async (body: CreateUserBody) => userSchema.parse((await api.post<unknown>('/admin/users', body)).data),
   updateUser: async (id: number, body: UpdateUserBody) => userSchema.parse((await api.patch<unknown>(`/admin/users/${id}`, body)).data),

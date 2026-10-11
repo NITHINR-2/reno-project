@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { FleetFilters } from './components/FleetFilters'
 import { FleetTable } from './components/FleetTable'
 import { MetricCards } from './components/MetricCards'
+import { SlaAlert } from './components/SlaAlert'
 import { FleetDrawer } from './drawer/FleetDrawer'
 import { useFleetFilters, type Stage } from './filters'
 
@@ -14,7 +15,11 @@ export function FleetWorkspace({ title, description, defaultStage }: FleetWorksp
 
   return (
     <>
-      <PageHeader title={title} description={description} />
+      <PageHeader
+        title={title}
+        description={description}
+        actions={<SlaAlert stage={defaultStage} onShow={() => filters.setFilter('sla', 'AT_RISK,BREACHED')} />}
+      />
       <MetricCards activeStage={filters.values.status} onSelectStage={(stage) => filters.setFilter('status', `stage:${stage}`)} />
       <Card>
         <FleetFilters

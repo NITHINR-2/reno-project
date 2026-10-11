@@ -1,6 +1,7 @@
 package com.renault.fleet.fleetrequest.dto;
 
 import com.renault.fleet.fleetrequest.entity.FleetRequestStatus;
+import com.renault.fleet.sla.entity.SlaStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -18,6 +19,9 @@ public record FleetRequestSummaryDto(
         int productionRequired,
         LocalDate requestedDeliveryDate,
         FleetRequestStatus status,
+        Instant stageEnteredAt,
+        Instant slaDueAt,
+        SlaStatus slaStatus,
         Long version,
         Instant createdAt,
         Instant updatedAt) {

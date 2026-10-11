@@ -11,7 +11,8 @@ import type { FleetMetrics } from '../api'
 import type { Stage } from '../filters'
 import { useFleetSummary } from '../queries'
 
-type Metric = { key: keyof FleetMetrics; label: string; icon: LucideIcon; stage?: Stage; hint: string }
+type CountKey = { [K in keyof FleetMetrics]: FleetMetrics[K] extends number ? K : never }[keyof FleetMetrics]
+type Metric = { key: CountKey; label: string; icon: LucideIcon; stage?: Stage; hint: string }
 
 const METRICS: Metric[] = [
   { key: 'activeRequests', label: 'Active requests', icon: Layers, stage: 'active', hint: 'Not completed or cancelled' },

@@ -8,9 +8,10 @@ import { fade } from '@/lib/motion'
 import { AuditLogTab } from './AuditLogTab'
 import { DealersTab } from './DealersTab'
 import { RolesTab } from './RolesTab'
+import { SlaPoliciesTab } from './SlaPoliciesTab'
 import { UsersTab } from './UsersTab'
 
-type AdminTab = 'users' | 'roles' | 'dealers' | 'audit'
+type AdminTab = 'users' | 'roles' | 'dealers' | 'audit' | 'sla'
 
 /** Tabs follow the permissions; the server checks each call again. */
 const TABS: (TabItem<AdminTab> & { anyOf: string[] })[] = [
@@ -18,6 +19,7 @@ const TABS: (TabItem<AdminTab> & { anyOf: string[] })[] = [
   { id: 'roles', label: 'Roles', anyOf: ['ADMIN_USERS_MANAGE'] },
   { id: 'dealers', label: 'Dealers', anyOf: ['ADMIN_DEALERS_MANAGE'] },
   { id: 'audit', label: 'Audit log', anyOf: ['AUDIT_LOG_READ'] },
+  { id: 'sla', label: 'SLA', anyOf: ['SLA_POLICY_MANAGE'] },
 ]
 
 export function AdminConsolePage() {
@@ -29,7 +31,7 @@ export function AdminConsolePage() {
 
   return (
     <>
-      <PageHeader title="Admin Console" description="Users, roles, dealer onboarding and the audit log." />
+      <PageHeader title="Admin Console" description="Users, roles, dealer onboarding, the audit log and SLA policies." />
       <Card>
         <Tabs
           tabs={tabs}
@@ -45,6 +47,7 @@ export function AdminConsolePage() {
             {active === 'roles' && <RolesTab />}
             {active === 'dealers' && <DealersTab />}
             {active === 'audit' && <AuditLogTab />}
+            {active === 'sla' && <SlaPoliciesTab />}
           </motion.div>
         </AnimatePresence>
       </Card>

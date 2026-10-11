@@ -29,6 +29,7 @@ import com.renault.fleet.production.repository.PlantRepository;
 import com.renault.fleet.quotation.entity.TaxRate;
 import com.renault.fleet.quotation.repository.TaxRateRepository;
 import com.renault.fleet.security.AuthenticatedUser;
+import com.renault.fleet.sla.service.SlaService;
 import com.renault.fleet.user.entity.User;
 import com.renault.fleet.user.repository.UserRepository;
 import com.renault.fleet.workflow.service.WorkflowHistoryService;
@@ -74,12 +75,13 @@ public class DevBusinessSeeder implements ApplicationRunner {
     private final WorkflowHistoryService history;
     private final AuditService audit;
     private final Clock clock;
+    private final SlaService sla;
 
     public DevBusinessSeeder(RegionRepository regions, PlantRepository plants, DealerRepository dealers,
             VehicleModelRepository models, VehicleVariantRepository variants, InventoryLocationRepository locations,
             InventoryStockRepository stock, TaxRateRepository taxRates, FleetRequestRepository requests,
             PaymentReceiptRepository receipts, UserRepository users, WorkflowHistoryService history, AuditService audit,
-            Clock clock) {
+            Clock clock, SlaService sla) {
         this.regions = regions;
         this.plants = plants;
         this.dealers = dealers;
@@ -94,6 +96,7 @@ public class DevBusinessSeeder implements ApplicationRunner {
         this.history = history;
         this.audit = audit;
         this.clock = clock;
+        this.sla = sla;
     }
 
     @Override
@@ -153,6 +156,7 @@ public class DevBusinessSeeder implements ApplicationRunner {
         request.setRequiredDeposit(new BigDecimal("5000000.00"));
         request.setProductionEstimateWeeks(6);
         request.setNotes("Seeded demo request: 50 units, 30 in the Chennai yard, so 20 to be produced at Pune.");
+        sla.enterStage(request);
         requests.saveAndFlush(request);
         history.record(request, null, request.getStatus(), "CREATED", AuthenticatedUser.from(creator.get()), null, null);
 

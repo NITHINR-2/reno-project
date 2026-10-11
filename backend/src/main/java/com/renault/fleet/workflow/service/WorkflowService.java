@@ -14,6 +14,7 @@ import com.renault.fleet.fleetrequest.mapper.FleetRequestAuditMapper;
 import com.renault.fleet.fleetrequest.repository.FleetRequestRepository;
 import com.renault.fleet.fleetrequest.service.FleetRequestDetailAssembler;
 import com.renault.fleet.security.AuthenticatedUser;
+import com.renault.fleet.sla.service.SlaService;
 import com.renault.fleet.workflow.entity.WorkflowAction;
 import com.renault.fleet.workflow.service.WorkflowTransitions.Resolution;
 import com.renault.fleet.workflow.service.WorkflowTransitions.Transition;
@@ -38,10 +39,11 @@ public class WorkflowService {
     private final TransitionEffects effects;
     private final FleetRequestDetailAssembler assembler;
     private final WorkflowFacts facts;
+    private final SlaService sla;
 
     public WorkflowService(FleetRequestRepository requests, WorkflowHistoryService history, AuditService audit,
             FleetRequestAuditMapper auditMapper, TransitionEffects effects,
-            FleetRequestDetailAssembler assembler, WorkflowFacts facts) {
+            FleetRequestDetailAssembler assembler, WorkflowFacts facts, SlaService sla) {
         this.requests = requests;
         this.history = history;
         this.audit = audit;
@@ -49,6 +51,7 @@ public class WorkflowService {
         this.effects = effects;
         this.assembler = assembler;
         this.facts = facts;
+        this.sla = sla;
     }
 
     @Transactional
@@ -103,6 +106,7 @@ public class WorkflowService {
         Map<String, Object> effects = this.effects.apply(request, transition.action(), reason);
         String metadata = effects.isEmpty() ? null : auditMapper.toJson(effects);
         request.setStatus(transition.to());
+        sla.enterStage(request);
         requests.flush();
 
         history.record(request, from, transition.to(), transition.action().name(), actor, reason, metadata);

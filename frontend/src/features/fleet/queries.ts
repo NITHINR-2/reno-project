@@ -12,13 +12,16 @@ export const fleetKeys = {
 const refKeys = { ref: (name: string) => ['ref', name] as const }
 const REF_STALE = 5 * 60_000
 
-export const useFleetSummary = () => useQuery({ queryKey: fleetKeys.summary(), queryFn: fleetApi.summary })
+/** SLA status changes with time, so open views refresh from the server once a minute. */
+const SLA_REFRESH_MS = 60_000
+
+export const useFleetSummary = () => useQuery({ queryKey: fleetKeys.summary(), queryFn: fleetApi.summary, refetchInterval: SLA_REFRESH_MS })
 
 export const useFleetList = (params: ListParams) =>
-  useQuery({ queryKey: fleetKeys.list(params), queryFn: () => fleetApi.list(params), placeholderData: keepPreviousData })
+  useQuery({ queryKey: fleetKeys.list(params), queryFn: () => fleetApi.list(params), placeholderData: keepPreviousData, refetchInterval: SLA_REFRESH_MS })
 
 export const useFleetDetail = (id: number | null) =>
-  useQuery({ queryKey: fleetKeys.detail(id ?? 0), queryFn: () => fleetApi.detail(id as number), enabled: id !== null })
+  useQuery({ queryKey: fleetKeys.detail(id ?? 0), queryFn: () => fleetApi.detail(id as number), enabled: id !== null, refetchInterval: SLA_REFRESH_MS })
 
 const parts = {
   history: fleetApi.history,

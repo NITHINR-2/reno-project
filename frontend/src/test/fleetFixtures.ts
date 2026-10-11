@@ -24,6 +24,9 @@ export const row = (overrides: Partial<FleetRequestRow> = {}): FleetRequestRow =
   productionRequired: 20,
   requestedDeliveryDate: '2026-12-15',
   status: 'PENDING_MARKETING_REVIEW',
+  stageEnteredAt: '2026-10-01T05:00:00Z',
+  slaDueAt: '2026-10-03T05:00:00Z',
+  slaStatus: 'BREACHED',
   version: 3,
   createdAt: '2026-10-01T05:00:00Z',
   updatedAt: '2026-10-02T05:00:00Z',
@@ -34,6 +37,10 @@ export const detail = (status: FleetStatus = 'PENDING_MARKETING_REVIEW', overrid
   id: 1,
   requestNumber: 'FLT-2026-0891',
   status,
+  stageEnteredAt: '2026-10-01T05:00:00Z',
+  slaWarningAt: '2026-10-02T17:00:00Z',
+  slaDueAt: '2026-10-03T05:00:00Z',
+  slaStatus: status === 'COMPLETED' || status === 'CANCELLED' ? null : 'BREACHED',
   dealer: { id: 10, code: 'CHN-N', name: 'Chennai North Dealership', regionId: 1, regionName: 'Chennai Region' },
   variant: { id: 5, code: 'DUS-RXZ-P', name: 'RXZ Petrol', modelId: 2, modelName: 'Renault Duster', unitPrice: 1200000 },
   plant: { id: 1, code: 'PUN', name: 'Pune Plant' },
@@ -71,6 +78,14 @@ export const metrics = {
   completed: 5,
   cancelled: 1,
   byStatus: {},
+  slaAtRisk: 4,
+  slaBreached: 2,
+  slaByStage: {
+    marketing: { atRisk: 3, breached: 1 },
+    executive: { atRisk: 0, breached: 0 },
+    finance: { atRisk: 1, breached: 1 },
+    operations: { atRisk: 0, breached: 0 },
+  },
 }
 
 /** A signed-in `user` and a backend holding one request in the given detail state. */

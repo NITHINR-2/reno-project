@@ -32,6 +32,7 @@ export type ListParams = {
   plantId?: string
   createdFrom?: string
   createdTo?: string
+  sla?: string[]
 }
 
 async function getPage<T extends z.ZodType>(url: string, item: T, params?: object): Promise<Page<z.infer<T>>> {

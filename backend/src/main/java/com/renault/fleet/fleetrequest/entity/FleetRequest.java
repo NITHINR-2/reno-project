@@ -78,6 +78,16 @@ public class FleetRequest extends BaseEntity {
     /** Set when Marketing maps stock (even to zero units); required before qualification. */
     private Instant stockMappedAt;
 
+    /** Stage clock (V10), frozen on entry to each status by {@code SlaService}; null due = no SLA for the stage. */
+    private Instant stageEnteredAt;
+
+    private Instant slaWarningAt;
+
+    private Instant slaDueAt;
+
+    /** Set once by the breach scan, so an SLA_BREACHED event is recorded at most once per stage entry. */
+    private Instant slaBreachedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "stock_mapped_by_id")
     private User stockMappedBy;
@@ -131,6 +141,17 @@ public class FleetRequest extends BaseEntity {
     public LocalDate getRequestedDeliveryDate() { return requestedDeliveryDate; }
     public void setRequestedDeliveryDate(LocalDate date) { this.requestedDeliveryDate = date; }
     public FleetRequestStatus getStatus() { return status; }
+    public Instant getStageEnteredAt() { return stageEnteredAt; }
+    public Instant getSlaWarningAt() { return slaWarningAt; }
+    public Instant getSlaDueAt() { return slaDueAt; }
+    public Instant getSlaBreachedAt() { return slaBreachedAt; }
+
+    public void startStageClock(Instant enteredAt, Instant warningAt, Instant dueAt) {
+        this.stageEnteredAt = enteredAt;
+        this.slaWarningAt = warningAt;
+        this.slaDueAt = dueAt;
+        this.slaBreachedAt = null;
+    }
     public void setStatus(FleetRequestStatus status) { this.status = status; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }

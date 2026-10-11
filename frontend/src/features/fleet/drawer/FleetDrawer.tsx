@@ -13,6 +13,7 @@ import { editability, TAB_LABELS, visibleTabs, type DrawerTab, type Editability 
 import { AuditTab } from './AuditTab'
 import { FinanceTab } from './FinanceTab'
 import { InventoryTab } from './InventoryTab'
+import { SlaChip } from '../components/SlaChip'
 import { OverrideBanner } from './OverrideBanner'
 import { OverridePanel } from './OverridePanel'
 import { OverviewTab } from './OverviewTab'
@@ -52,6 +53,7 @@ function DrawerTitle({ id }: { id: number | null }) {
     <span className="flex flex-wrap items-center gap-2">
       <span className="font-mono">{data.requestNumber}</span>
       <StatusBadge status={data.status} />
+      {data.slaStatus && <SlaChip status={data.slaStatus} dueAt={data.slaDueAt} />}
     </span>
   )
 }

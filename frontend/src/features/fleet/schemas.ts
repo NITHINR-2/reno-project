@@ -18,6 +18,11 @@ export const STATUSES = [
 ] as const
 export type FleetStatus = (typeof STATUSES)[number]
 
+export const SLA_STATUSES = ['ON_TRACK', 'AT_RISK', 'BREACHED'] as const
+export type SlaStatus = (typeof SLA_STATUSES)[number]
+/** Computed by the server; null when the stage has no SLA (untimed or terminal). */
+const slaStatus = z.enum(SLA_STATUSES).nullish()
+
 // Money arrives as JSON numbers from BigDecimal; the UI only displays it, never calculates with it.
 const money = z.number()
 
@@ -35,6 +40,9 @@ export const summaryRowSchema = z.object({
   productionRequired: z.number(),
   requestedDeliveryDate: z.string().nullish(),
   status: z.enum(STATUSES),
+  stageEnteredAt: z.string().nullish(),
+  slaDueAt: z.string().nullish(),
+  slaStatus,
   version: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -50,6 +58,9 @@ export const metricsSchema = z.object({
   unitsToProduce: z.number(),
   completed: z.number(),
   cancelled: z.number(),
+  slaAtRisk: z.number(),
+  slaBreached: z.number(),
+  slaByStage: z.record(z.string(), z.object({ atRisk: z.number(), breached: z.number() })),
 })
 export type FleetMetrics = z.infer<typeof metricsSchema>
 
@@ -69,6 +80,10 @@ export const detailSchema = z.object({
   id: z.number(),
   requestNumber: z.string(),
   status: z.enum(STATUSES),
+  stageEnteredAt: z.string().nullish(),
+  slaWarningAt: z.string().nullish(),
+  slaDueAt: z.string().nullish(),
+  slaStatus,
   dealer: z.object({ id: z.number(), code: z.string(), name: z.string(), regionId: z.number().nullish(), regionName: z.string().nullish() }),
   variant: z.object({ id: z.number(), code: z.string(), name: z.string(), modelId: z.number(), modelName: z.string(), unitPrice: money }),
   plant: z.object({ id: z.number(), code: z.string(), name: z.string() }).nullish(),

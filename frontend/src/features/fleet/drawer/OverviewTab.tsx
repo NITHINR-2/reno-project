@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/useToast'
 import { formatCount, formatDate, formatDateTime, formatINR, statusLabel, todayIST } from '@/lib/format'
 import type { FleetRequestDetail } from '../api'
 import { useUpdateRequest } from '../queries'
+import { SlaChip } from '../components/SlaChip'
 import { DetailList, ReadOnlyNotice, Section } from './parts'
 import { reportError } from '@/lib/reportError'
 
@@ -45,6 +46,8 @@ export function OverviewTab({ request, canEdit }: { request: FleetRequestDetail;
             ['Created', `${formatDateTime(request.createdAt)}${request.createdBy ? ` by ${request.createdBy.fullName}` : ''}`],
             ['Assigned to', request.assignedTo?.fullName],
             ['Status', statusLabel(request.status)],
+            ['In this stage since', formatDateTime(request.stageEnteredAt)],
+            ['SLA', request.slaDueAt ? <span key="sla" className="flex flex-wrap items-center gap-2"><SlaChip status={request.slaStatus} dueAt={request.slaDueAt} /><span className="text-xs text-fg-muted">due {formatDateTime(request.slaDueAt)}</span></span> : 'No SLA for this stage'],
           ]}
         />
         {request.returnReason && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">Returned: {request.returnReason}</p>}

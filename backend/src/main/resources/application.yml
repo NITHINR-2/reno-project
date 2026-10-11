@@ -44,6 +44,12 @@ fleet:
     default-terms: >-
       Prices include GST at the rate shown. This quotation is valid until the date stated.
       Issuing this quotation is not a receipt of payment. Delivery follows financial clearance.
+  sla:
+    breach-scan:
+      # Records SLA_BREACHED events; ISO-8601 durations.
+      enabled: true
+      interval: PT5M
+      initial-delay: PT1M
   security:
     jwt:
       # HS256 signing secret, >= 32 bytes. Required; startup fails without it. Generate: openssl rand -base64 48
@@ -74,6 +80,10 @@ spring:
     clean-disabled: true
 
 fleet:
+  sla:
+    breach-scan:
+      # Tests call SlaBreachJob.scan() directly; a background scan would race their assertions.
+      enabled: false
   security:
     jwt:
       # Random per test run (2 x 128-bit hex), so no secret is committed.

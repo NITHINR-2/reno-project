@@ -4,6 +4,7 @@ import com.renault.fleet.fleetrequest.entity.FleetRequestStatus;
 import com.renault.fleet.inventory.dto.StockAllocationDto;
 import com.renault.fleet.workflow.entity.WorkflowAction;
 import java.math.BigDecimal;
+import com.renault.fleet.sla.entity.SlaStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -16,6 +17,10 @@ public record FleetRequestDetailDto(
         Long id,
         String requestNumber,
         FleetRequestStatus status,
+        Instant stageEnteredAt,
+        Instant slaWarningAt,
+        Instant slaDueAt,
+        SlaStatus slaStatus,
         DealerRef dealer,
         VariantRef variant,
         PlantRef plant,

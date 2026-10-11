@@ -3,6 +3,7 @@ import { StatusBadge } from '@/components/ui/Badge'
 import { formatCount, formatDate, formatDateTime } from '@/lib/format'
 import type { ListParams, FleetRequestRow } from '../api'
 import { useFleetList } from '../queries'
+import { SlaChip } from './SlaChip'
 
 const columns: Column<FleetRequestRow>[] = [
   { key: 'number', header: 'Request', sortKey: 'requestNumber', cell: (r) => <span className="font-mono font-medium text-fg">{r.requestNumber}</span> },
@@ -33,6 +34,7 @@ const columns: Column<FleetRequestRow>[] = [
   { key: 'production', header: 'To produce', sortKey: 'productionRequired', className: 'text-right tabular-nums', cell: (r) => formatCount(r.productionRequired) },
   { key: 'delivery', header: 'Delivery', sortKey: 'requestedDeliveryDate', cell: (r) => formatDate(r.requestedDeliveryDate), mobile: false },
   { key: 'status', header: 'Status', sortKey: 'status', cell: (r) => <StatusBadge status={r.status} /> },
+  { key: 'sla', header: 'SLA', sortKey: 'slaDueAt', cell: (r) => <SlaChip status={r.slaStatus} dueAt={r.slaDueAt} /> },
   { key: 'updated', header: 'Updated', sortKey: 'updatedAt', cell: (r) => <span className="whitespace-nowrap text-fg-muted">{formatDateTime(r.updatedAt)}</span>, mobile: false },
 ]
 
