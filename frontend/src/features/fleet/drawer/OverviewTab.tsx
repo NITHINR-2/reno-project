@@ -11,7 +11,7 @@ import { formatCount, formatDate, formatDateTime, formatINR, statusLabel, todayI
 import type { FleetRequestDetail } from '../api'
 import { useUpdateRequest } from '../queries'
 import { DetailList, ReadOnlyNotice, Section } from './parts'
-import { reportError } from './reportError'
+import { reportError } from '@/lib/reportError'
 
 // Mirrors UpdateFleetRequestDto's Bean Validation; the server re-validates.
 const schema = z.object({

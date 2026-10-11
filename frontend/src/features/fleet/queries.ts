@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { fleetApi, type DispatchBody, type ListParams, type ProductionBody, type ReceiptBody, type UpdateBody } from './api'
+import { fleetApi, type DispatchBody, type OverrideBody, type ListParams, type ProductionBody, type ReceiptBody, type UpdateBody } from './api'
 
 export const fleetKeys = {
   all: ['fleet'] as const,
@@ -68,6 +68,7 @@ export const useIssueQuotation = () =>
 export const useRecordReceipt = (id: number) => useFleetMutation((body: ReceiptBody) => fleetApi.recordReceipt(id, body))
 export const useApproveReceipt = () => useFleetMutation((receiptId: number) => fleetApi.approveReceipt(receiptId))
 export const useScheduleProduction = (id: number) => useFleetMutation((body: ProductionBody) => fleetApi.scheduleProduction(id, body))
+export const useOverride = (id: number) => useFleetMutation((body: OverrideBody) => fleetApi.override(id, body))
 export const useTransition = (id: number) =>
   useFleetMutation(({ endpoint, ...body }: { endpoint: string; version: number; reason?: string }) => fleetApi.transition(id, endpoint, body))
 export const useScheduleDispatch = (id: number) => useFleetMutation((body: DispatchBody) => fleetApi.scheduleDispatch(id, body))

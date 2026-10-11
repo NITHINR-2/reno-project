@@ -54,9 +54,9 @@ function DialogPanel({ onClose, title, description, footer, children, role = 'di
           {title}
         </h2>
         {description && (
-          <p id={descriptionId} className="mt-1 text-sm text-fg-muted">
+          <div id={descriptionId} className="mt-1 text-sm text-fg-muted">
             {description}
-          </p>
+          </div>
         )}
         {children && <div className="mt-4">{children}</div>}
         {footer && <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{footer}</div>}

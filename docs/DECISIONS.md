@@ -193,3 +193,16 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **The quotation view shows the backend's lines (qty, unit price, base, GST, line total), totals, deposit shortfall and terms exactly as returned; the browser formats but never computes money.**
 - **Only the top-most overlay handles Escape/Tab (a stack in `useOverlay`)** — a confirmation over the drawer closed both before.
 - **The toast container is a named `region` ("Notifications")** — screen readers can find it, and tests can tell a toast from a status badge with the same words.
+
+## Phase 5C — Admin Console and Supervisor override
+
+- **New read-only `GET /api/admin/roles` (ADMIN_USERS_MANAGE): roles with their permission codes** — roles and grants come from migration V6; the console shows them but cannot edit them (editing permissions was not in scope and would be a security change).
+- **Admin Console tabs follow permissions: Users and Roles need ADMIN_USERS_MANAGE, Dealers ADMIN_DEALERS_MANAGE, Audit log AUDIT_LOG_READ; the selected tab is in the URL (`?tab=`).**
+- **User rules mirror the server: only a Supervisor sees the SUPERVISOR role option or can edit a Supervisor account; nobody can change their own role or (de)activate themselves. (De)activation is confirmed. Passwords are only entered on create (12–128 chars, not containing the username) and are never shown again.**
+- **Dealer onboarding mirrors the server patterns (code, GSTIN, phone, PIN); a status change (pending / active / suspended) is confirmed because only ACTIVE dealers can be used on new requests (checked in `FleetRequestService.create`).**
+- **The audit log viewer is read-only with debounced text filters (actor, action, entity type, entity id) and a date range; a row opens before/after JSON, actor role, IP and reason.**
+- **Override is a Supervisor-only switch in the request drawer (WORKFLOW_OVERRIDE, non-terminal states); turning it on shows a red banner and replaces the tabs with the override form for the five allow-listed fields only** — nothing else is offered, and the server refuses other fields anyway.
+- **An override needs a reason and at least one changed field; a confirmation lists each changed field's current and new value with the reason; only changed fields are sent, and cleared optional fields are sent as `null`.**
+- **The override audit trail is read from the request's audit rows (action OVERRIDE), diffing before/after JSON** — no new endpoint; Supervisors already hold AUDIT_LOG_READ.
+- **Supervisor Cancel is now a footer action (from `allowedActions`) with a required reason.** Reassign UI is not built yet.
+- **Shared pieces promoted: `components/ui/Tabs` (used by the drawer and Admin Console) and `lib/reportError`; `Dialog` descriptions render in a `<div>` so they can hold a table.**

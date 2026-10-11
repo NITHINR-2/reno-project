@@ -19,8 +19,7 @@ export type TabAction = { kind: 'tab'; label: string; tab: DrawerTab }
 
 /**
  * Buttons for the server's `allowedActions` (role + state + guards, evaluated by the backend).
- * Actions not listed here (AWAIT_PAYMENT, VERIFY_FUNDS) are performed by the system, and CANCEL
- * belongs to the Supervisor override phase. ISSUE_QUOTATION is never offered beforehand (its guard
+ * Actions not listed here (AWAIT_PAYMENT, VERIFY_FUNDS) are performed by the system. ISSUE_QUOTATION is never offered beforehand (its guard
  * needs an issued quotation), so the quotation and receipt shortcuts come from `tabShortcuts` instead.
  */
 export const WORKFLOW_ACTIONS: Record<string, TransitionAction | TabAction> = {
@@ -98,6 +97,16 @@ export const WORKFLOW_ACTIONS: Record<string, TransitionAction | TabAction> = {
     confirmTitle: 'Mark this request completed?',
     confirmText: 'Production orders and dispatches are closed and the allocated yard stock is consumed.',
     success: 'Request completed',
+  },
+  CANCEL: {
+    kind: 'transition',
+    label: 'Cancel request',
+    endpoint: 'cancel',
+    tone: 'danger',
+    requireReason: true,
+    confirmTitle: 'Cancel this request?',
+    confirmText: 'Allocated stock is released and open quotations, production orders and dispatches are voided. Recorded payments stay on file. This cannot be undone.',
+    success: 'Request cancelled',
   },
 }
 

@@ -16,7 +16,7 @@ import { formatDate, formatINR, statusLabel, todayIST } from '@/lib/format'
 import { PAYMENT_METHODS, RECEIPT_TYPES, type FleetRequestDetail, type Receipt } from '../api'
 import { useApproveReceipt, useFleetPart, useRecordReceipt } from '../queries'
 import { DetailList, ReadOnlyNotice, Rows, Section } from './parts'
-import { reportError } from './reportError'
+import { reportError } from '@/lib/reportError'
 
 // Mirrors RecordReceiptRequest; uniqueness of the reference is enforced by the server (409).
 const schema = z.object({

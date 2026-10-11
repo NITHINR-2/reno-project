@@ -415,3 +415,22 @@ Waiting for the next phase prompt. Nothing from later phases has been started.
 **Open:** Supervisor cancel / override / reassign UI; create-request form; SLA (Phase 6); bundle splitting; visual check at 360–1440 px.
 
 **Next:** waiting for the next phase prompt.
+
+---
+
+## Phase 5C — Admin Console and Supervisor override (2026-10-11) ✅
+
+**New dependencies:** none. **Backend:** `GET /api/admin/roles` (roles + permissions, read-only). **Frontend:** Admin Console with tabs Users (search/role/status filters, create with validation, edit, confirmed (de)activation, Supervisor-account and self rules), Roles (permissions per role), Dealers (onboarding form with GSTIN/PIN/phone/code checks, edit, confirmed status change), Audit log (filters, before/after detail). Fleet drawer: Supervisor override switch + red banner → override form (5 allow-listed fields, required reason, old-vs-new confirmation, `null` clears), override audit trail; Supervisor Cancel (reason) in the footer. `Tabs` and `reportError` moved to shared code.
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o test -Dtest=AdminApiTest` | 6 tests, 0 failures (new roles test) |
+| `npx vitest --run src/features` (after Cancel) | 2 failures — expected button lists lacked the new "Cancel request"; expectations updated |
+| `npm test -- --run --reporter=dot` | **11 files, 92 tests passed** (override 8, admin console 12 new) |
+| `npm run lint` / `npm run build` | 0 findings (after un-exporting a constant) / OK |
+| `./mvnw -q -o verify` | **exit 0 — 1292 tests, 0 failures, 0 errors** |
+| Live (dev jar on :18080, scratch DB `fleet_p5ccheck`) | override with UI body → 200, deposit 40L, estimate cleared; no reason → 400; as Admin → 403; audit OVERRIDE before/after keys match the trail; roles/users/dealers/audit JSON parsed by the frontend schemas. Scratch DB dropped. |
+
+**Open:** Supervisor reassign UI; create-request form; password reset; SLA and dashboard (Phase 6); bundle splitting; visual check at 360–1440 px.
+
+**Next:** waiting for the next phase prompt.

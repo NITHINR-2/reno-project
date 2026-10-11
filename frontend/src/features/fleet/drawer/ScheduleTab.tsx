@@ -15,7 +15,7 @@ import { formatCount, formatDate, statusLabel, todayIST } from '@/lib/format'
 import type { FleetRequestDetail } from '../api'
 import { useFleetPart, useScheduleDispatch, useScheduleProduction } from '../queries'
 import { ReadOnlyNotice, Rows, Section } from './parts'
-import { reportError } from './reportError'
+import { reportError } from '@/lib/reportError'
 
 const notPast = (v: string) => v >= todayIST()
 const productionSchema = z

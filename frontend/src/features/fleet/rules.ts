@@ -43,6 +43,8 @@ export function editability(user: AuthUser, request: FleetRequestDetail) {
     // Scheduling guards (e.g. nothing to produce) are evaluated by the server into allowedActions.
     production: hasPermission(user, 'PRODUCTION_SCHEDULE') && allowed('SCHEDULE_PRODUCTION'),
     dispatch: hasPermission(user, 'DISPATCH_SCHEDULE') && allowed('SCHEDULE_DISPATCH'),
+    // Overrides work in any non-terminal state; the server limits which fields can change.
+    override: hasPermission(user, 'WORKFLOW_OVERRIDE') && status !== 'COMPLETED' && status !== 'CANCELLED',
   }
 }
 

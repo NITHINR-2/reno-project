@@ -4,15 +4,17 @@ import { Drawer } from '@/components/ui/Drawer'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { StatusBadge } from '@/components/ui/Badge'
+import { Tabs } from '@/components/ui/Tabs'
 import { useAuthUser } from '@/features/auth/useAuth'
 import { fade } from '@/lib/motion'
 import type { FleetRequestDetail } from '../api'
 import { useFleetDetail } from '../queries'
-import { editability, visibleTabs, type DrawerTab } from '../rules'
+import { editability, TAB_LABELS, visibleTabs, type DrawerTab, type Editability } from '../rules'
 import { AuditTab } from './AuditTab'
-import { DrawerTabs } from './DrawerTabs'
 import { FinanceTab } from './FinanceTab'
 import { InventoryTab } from './InventoryTab'
+import { OverrideBanner } from './OverrideBanner'
+import { OverridePanel } from './OverridePanel'
 import { OverviewTab } from './OverviewTab'
 import { PaymentsTab } from './PaymentsTab'
 import { ScheduleTab } from './ScheduleTab'
@@ -69,10 +71,34 @@ function DrawerTabsBody({ request, tab, onTabChange: setActive }: { request: Fle
   const active = tabs.includes(tab) ? tab : 'overview'
   const can = editability(user, request)
   const idPrefix = `fleet-${request.id}`
+  const [overriding, setOverriding] = useState(false)
+  const overrideOn = overriding && can.override
 
   return (
     <>
-      <DrawerTabs tabs={tabs} active={active} onChange={setActive} idPrefix={idPrefix} />
+      {can.override && <OverrideBanner on={overrideOn} onToggle={setOverriding} />}
+      {overrideOn ? (
+        <OverridePanel request={request} />
+      ) : (
+        <SectionTabs request={request} active={active} onChange={setActive} tabs={tabs} can={can} idPrefix={idPrefix} />
+      )}
+    </>
+  )
+}
+
+type SectionTabsProps = { request: FleetRequestDetail; active: DrawerTab; onChange: (t: DrawerTab) => void; tabs: DrawerTab[]; can: Editability; idPrefix: string }
+
+function SectionTabs({ request, active, onChange: setActive, tabs, can, idPrefix }: SectionTabsProps) {
+  return (
+    <>
+      <Tabs
+        tabs={tabs.map((t) => ({ id: t, label: TAB_LABELS[t] }))}
+        active={active}
+        onChange={setActive}
+        idPrefix={idPrefix}
+        label="Request sections"
+        className="-mx-4 px-2 sm:-mx-6 sm:px-4"
+      />
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={active}

@@ -44,8 +44,8 @@ describe('workflow action buttons per role and state', () => {
     // The server never offers ISSUE_QUOTATION up front (seen live); the shortcuts follow role + state.
     ['FINANCE_TEAM', 'PENDING_FINANCE_CLEARANCE', [], ['Quotation…', 'Receipts…']],
     ['FINANCE_TEAM', 'FUNDS_VERIFIED', ['GRANT_CLEARANCE'], ['Receipts…', 'Grant clearance']],
-    ['SUPERVISOR', 'FINANCIALLY_CLEARED', ['SCHEDULE_PRODUCTION', 'CANCEL'], ['Schedule production…']],
-    ['SUPERVISOR', 'DISPATCH_SCHEDULED', ['COMPLETE', 'CANCEL'], ['Mark completed']],
+    ['SUPERVISOR', 'FINANCIALLY_CLEARED', ['SCHEDULE_PRODUCTION', 'CANCEL'], ['Schedule production…', 'Cancel request']],
+    ['SUPERVISOR', 'DISPATCH_SCHEDULED', ['COMPLETE', 'CANCEL'], ['Mark completed', 'Cancel request']],
     // System steps and actions the server didn't offer never show a button.
     ['FINANCE_TEAM', 'PAYMENT_PENDING', ['AWAIT_PAYMENT', 'VERIFY_FUNDS'], ['Receipts…']],
     ['MARKETING_HEAD', 'PAYMENT_PENDING', [], []],

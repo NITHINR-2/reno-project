@@ -6,7 +6,7 @@ import type { FleetRequestDetail } from '../api'
 import { useTransition } from '../queries'
 import type { DrawerTab, Editability } from '../rules'
 import { tabShortcuts, WORKFLOW_ACTIONS, type TransitionAction } from '../workflowActions'
-import { reportError } from './reportError'
+import { reportError } from '@/lib/reportError'
 
 type Props = { request: FleetRequestDetail; can: Editability; onOpenTab: (tab: DrawerTab) => void }
 

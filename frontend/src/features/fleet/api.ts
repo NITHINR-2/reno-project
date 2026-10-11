@@ -72,6 +72,8 @@ export const fleetApi = {
     detailSchema.parse((await api.post<unknown>(`/fleet-requests/${id}/schedule-production`, body)).data),
   scheduleDispatch: async (id: number, body: DispatchBody) =>
     detailSchema.parse((await api.post<unknown>(`/fleet-requests/${id}/schedule-dispatch`, body)).data),
+  /** Supervisor override of allow-listed fields; `null` clears an optional field. */
+  override: async (id: number, body: OverrideBody) => detailSchema.parse((await api.post<unknown>(`/fleet-requests/${id}/override`, body)).data),
   /** Simple workflow transitions: `POST /fleet-requests/{id}/{endpoint}` with an optional reason and the version seen. */
   transition: async (id: number, endpoint: string, body: { version: number; reason?: string }) =>
     detailSchema.parse((await api.post<unknown>(`/fleet-requests/${id}/${endpoint}`, body)).data),
@@ -95,3 +97,6 @@ export type ReceiptBody = {
 }
 export type ProductionBody = { scheduledStart: string; estimatedCompletion: string; notes?: string; version: number }
 export type DispatchBody = { scheduledDate: string; carrier?: string; vehicleReference?: string; notes?: string; version: number }
+export const OVERRIDE_FIELDS = ['requiredDeposit', 'productionEstimateWeeks', 'requestedDeliveryDate', 'plantId', 'notes'] as const
+export type OverrideField = (typeof OVERRIDE_FIELDS)[number]
+export type OverrideBody = { reason: string; version: number; changes: Partial<Record<OverrideField, string | null>> }

@@ -10,7 +10,7 @@ import { formatCount, formatDateTime } from '@/lib/format'
 import type { FleetRequestDetail, StockOption } from '../api'
 import { useFleetPart, useMapStock } from '../queries'
 import { DetailList, ReadOnlyNotice, Rows, Section } from './parts'
-import { reportError } from './reportError'
+import { reportError } from '@/lib/reportError'
 
 export function InventoryTab({ request, canEdit }: { request: FleetRequestDetail; canEdit: boolean }) {
   const active = request.allocations.filter((a) => a.status === 'ACTIVE')

@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
+import { AdminConsolePage } from '@/features/admin/AdminConsolePage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ForbiddenPage } from '@/features/errors/ForbiddenPage'
 import { NotFoundPage } from '@/features/errors/NotFoundPage'
@@ -33,7 +34,9 @@ const moduleRoutes: RouteObject[] = NAV_ITEMS.map((item) => ({
   handle: { crumb: item.label },
   element: (
     <RequirePermission anyOf={item.anyOf}>
-      {FLEET_STAGES[item.to] ? (
+      {item.to === '/admin' ? (
+        <AdminConsolePage />
+      ) : FLEET_STAGES[item.to] ? (
         <FleetWorkspace key={item.to} title={item.label} description={DESCRIPTIONS[item.to]} defaultStage={FLEET_STAGES[item.to]} />
       ) : (
         <ModulePage item={item} description={DESCRIPTIONS[item.to]} />

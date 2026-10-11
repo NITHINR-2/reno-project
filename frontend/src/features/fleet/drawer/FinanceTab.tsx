@@ -10,7 +10,7 @@ import { formatCount, formatDate, formatINR, statusLabel } from '@/lib/format'
 import type { FleetRequestDetail, Quotation } from '../api'
 import { useCalculateQuotation, useFleetPart, useIssueQuotation } from '../queries'
 import { DetailList, ReadOnlyNotice, Rows, Section } from './parts'
-import { reportError } from './reportError'
+import { reportError } from '@/lib/reportError'
 
 const STATUS_TONE = { ISSUED: 'success', DRAFT: 'accent', CANCELLED: 'neutral', SUPERSEDED: 'neutral' } as const
 
