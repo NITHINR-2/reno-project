@@ -259,3 +259,7 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **Presets are rolling windows ending today: 30 days, Quarter = 90 days, Year = 365 days; Custom pins `from`/`to`. Filters live in the URL (`range`, `from`, `to`, `region`, `plant`); an inverted custom range shows an error and sends no request.**
 - **Every widget has a table view (the accessible equivalent, also used for CSV) and CSV export; Demand opens as a table with a region/model switch. CSV is UTF-8 with BOM; text starting with = + - @ is prefixed with ' (CSV injection).**
 - **KPI deltas are coloured good/bad by meaning (longer clearance time and more overdue are worse) and say "(better)/(worse)" in text, never colour alone.** Charts animate on load (500 ms ease-out) and not at all under reduced motion; CountUp moved to `components/ui`.
+
+## Fix — post-login landing after a sign-out (2026-10-11)
+
+- **After sign-in, return to the remembered page (`state.from`) only if the signed-in user's role can open it; otherwise go to `/`, which picks the user's first module (`landingFor` in `app/navigation.ts`).** Signing out clears the session first, so the auth guard remembers the current page; the next person may hold a different role and was sent to the 403 page. Same-role users (e.g. after a session expiry) still return to where they were, query string included. Non-module, `/forbidden`, unknown and protocol-relative (`//…`) targets always go home.

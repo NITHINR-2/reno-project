@@ -493,3 +493,17 @@ Waiting for the next phase prompt. Nothing from later phases has been started.
 **Open:** restart your backend to apply V11–V12 and the new dev seed (it adds the demo data once). Main bundle is still >500 kB. Overdue KPI is event-based (breaches recorded in the period), not "currently overdue". All Phase 6 items are done.
 
 **Next:** waiting for the next phase prompt.
+
+---
+
+## Fix — sign-in with another role landed on "Access denied" (2026-10-11) ✅
+
+**Cause:** sign-out clears the session before the top bar's own redirect, so the auth guard sent `/login` the last page as `from`; the login page sent whoever signed in next there without a permission check. **Fix:** `landingFor(user, from)` — back to `from` only if the new user may open it, else their home. Login now has one redirect path (the `<Navigate>` after the session loads).
+
+| Command | Result |
+|---|---|
+| New test against the old `LoginPage` | fails: `expected '/forbidden' to be '/finance'` (reproduces the bug) |
+| `npx vitest --run src/features/auth src/app` | 28 passed (regression test + 7 `landingFor` cases) |
+| `npm test -- --run --reporter=dot` / `npm run lint` / `npm run build` | **16 files, 134 tests passed** / 0 findings / OK |
+
+Backend unchanged, not re-run (last: 1361 tests, 0 failures).

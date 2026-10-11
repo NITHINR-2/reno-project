@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle, LockKeyhole } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useForm } from 'react-hook-form'
-import { Navigate, useLocation, useNavigate } from 'react-router'
+import { Navigate, useLocation } from 'react-router'
 import { z } from 'zod'
 import { Form } from '@/components/forms/Form'
 import { TextField } from '@/components/forms/TextField'
@@ -11,6 +11,7 @@ import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { Button } from '@/components/ui/Button'
 import { page } from '@/lib/motion'
 import { toProblem } from '@/lib/problem'
+import { landingFor } from '@/app/navigation'
 import { useCurrentUser, useLogin } from './useAuth'
 
 const loginSchema = z.object({
@@ -23,11 +24,11 @@ type LoginValues = z.infer<typeof loginSchema>
 export function LoginPage() {
   const { data: user } = useCurrentUser()
   const login = useLogin()
-  const navigate = useNavigate()
-  const from = (useLocation().state as { from?: string } | null)?.from ?? '/'
+  const from = (useLocation().state as { from?: string } | null)?.from
   const form = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { username: '', password: '' } })
 
-  if (user && !login.isPending) return <Navigate to={from} replace />
+  // Once signed in, go back to the remembered page only if this user's role can open it.
+  if (user && !login.isPending) return <Navigate to={landingFor(user, from)} replace />
 
   const failure = login.error ? toProblem(login.error) : null
   const failureText = failure?.status === 401 ? 'Invalid username or password.' : failure?.detail
@@ -68,9 +69,7 @@ export function LoginPage() {
             form={form}
             aria-label="Sign in"
             className="mt-6 space-y-4"
-            onSubmit={(values) =>
-              login.mutate(values, { onSuccess: () => navigate(from, { replace: true }) })
-            }
+            onSubmit={(values) => login.mutate(values)}
           >
             <TextField name="username" label="Username" autoComplete="username" autoCapitalize="none" spellCheck={false} required />
             <TextField name="password" label="Password" type="password" autoComplete="current-password" required />

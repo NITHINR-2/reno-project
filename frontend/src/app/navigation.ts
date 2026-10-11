@@ -29,3 +29,15 @@ export function navItem(to: string): NavItem {
   if (!item) throw new Error(`Unknown nav item ${to}`)
   return item
 }
+
+/**
+ * Where to land after sign-in. The remembered page (`from`, set when the session ended) is used only if this user
+ * may open it: after a sign-out, the next person may hold a different role. Anything else goes to `/`, which picks
+ * the user's first module.
+ */
+export function landingFor(user: AuthUser | null | undefined, from: string | undefined): string {
+  if (!from || !from.startsWith('/') || from.startsWith('//')) return '/'
+  const path = from.split(/[?#]/)[0]
+  const item = NAV_ITEMS.find((i) => path === i.to || path.startsWith(`${i.to}/`))
+  return item && hasPermission(user, ...item.anyOf) ? from : '/'
+}
