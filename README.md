@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Renault Group Fleet Portal
 
 A manufacturer/HQ-side B2B fleet management portal. It covers dealer onboarding, fleet requests, inventory and stock allocation, marketing qualification, executive approval, GST quotations, deposits and payment verification, production scheduling, dispatch, user and role admin, workflow history, and audited Supervisor overrides.
@@ -119,3 +120,7 @@ cd frontend && npm run test -- --run && npm run build && npm run lint
 ## Roles
 
 ADMIN, SUPERVISOR, MARKETING_MANAGER, MARKETING_HEAD and FINANCE_TEAM. Roles and permissions are seeded by Flyway (`V6__seed_roles_permissions.sql`) and enforced on the server with `@PreAuthorize`. See `claude.md` for the access matrix and workflow state machine. The whole workflow is implemented on the backend: marketing, executive, finance, production, dispatch, completion, and Supervisor override, reassign and cancel. The Admin Console APIs (users, audit log) are under `/api/admin`.
+=======
+# reno-project
+Reno project repository
+>>>>>>> a70f1250eaab8e3da9b4273b4c4108246aa3fe40
