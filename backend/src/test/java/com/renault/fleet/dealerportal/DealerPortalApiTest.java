@@ -144,7 +144,13 @@ class DealerPortalApiTest {
         as(post("/api/admin/catalogue/models").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"code\":\"BAD\",\"name\":\"x\",\"vehicleCategory\":\"SUV\",\"imageUrl\":\"http://plain\"}"),
                 hq.get(RoleCode.ADMIN)).andExpect(status().isBadRequest());
-        assertThat(auditLogs.findByEntityTypeAndEntityIdOrderById("VEHICLE_MODEL", String.valueOf(id))).hasSize(2);
+        as(patch("/api/admin/catalogue/models/" + id).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":1,\"imageUrl\":\"/cars/crud.jpg\"}"), hq.get(RoleCode.ADMIN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.imageUrl").value("/cars/crud.jpg"));
+        as(patch("/api/admin/catalogue/models/" + id).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":2,\"imageUrl\":\"/cars/../../x y.jpg\"}"), hq.get(RoleCode.ADMIN))
+                .andExpect(status().isBadRequest());
+        assertThat(auditLogs.findByEntityTypeAndEntityIdOrderById("VEHICLE_MODEL", String.valueOf(id))).hasSize(3);
         for (RoleCode role : List.of(RoleCode.MARKETING_MANAGER, RoleCode.MARKETING_HEAD, RoleCode.FINANCE_TEAM)) {
             as(get("/api/admin/catalogue/models"), hq.get(role)).andExpect(status().isForbidden());
         }

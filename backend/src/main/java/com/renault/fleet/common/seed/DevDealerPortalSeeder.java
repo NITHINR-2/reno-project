@@ -112,10 +112,16 @@ public class DevDealerPortalSeeder implements ApplicationRunner {
     }
 
     private void catalogue(String code, BodyType bodyType, int seats, String description) {
-        models.findByCode(code).filter(m -> m.getDescription() == null).ifPresent((VehicleModel m) -> {
-            m.setBodyType(bodyType);
-            m.setSeatingCapacity(seats);
-            m.setDescription(description);
+        models.findByCode(code).ifPresent((VehicleModel m) -> {
+            if (m.getDescription() == null) {
+                m.setBodyType(bodyType);
+                m.setSeatingCapacity(seats);
+                m.setDescription(description);
+            }
+            if (m.getImageUrl() == null) {
+                // Served by the frontend from public/cars (Wikimedia Commons photos; see public/cars/CREDITS.md).
+                m.setImageUrl("/cars/" + code.toLowerCase(Locale.ROOT) + ".jpg");
+            }
         });
     }
 

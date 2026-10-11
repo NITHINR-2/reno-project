@@ -319,3 +319,8 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **Marketing can move a reservation to another plant** (`POST /api/fleet-requests/{id}/move-reservation`, STOCK_MAP, PENDING_MARKETING_REVIEW only, optional reason): releases everything held, reserves min(quantity, free) at the target under the same locking, sets the plant, writes RESERVATION_MOVED to history and the audit log. No HQ UI for it yet.
 - **Dealer availability API:** `GET /api/dealer/plants` and `GET /api/dealer/catalogue/availability?plantId=` (no-store; display only).
 - **Frontend:** the plant picker is the cart's plant (one order = one plant, kept after an order). Cards show "N available at <plant>" minus units already in the cart, computed locally (no API call). Availability refetches every 15 s and on window focus, and after every order attempt. The cart shows "N from stock · M to be produced" per line and sends `expectedFromStock = min(qty, shown)`. A 409 opens "Only N available" with "Order N from stock, rest produced" (resubmits with the server's counts) or "Edit quantity" (back to the cart, nothing lost).
+
+## Fix — catalogue car photos (2026-10-11)
+
+- **Photos come from Wikimedia Commons (CC BY / CC BY-SA), not Renault's site** — CLAUDE.md forbids copying Renault's website or assets; Commons images may be reused with attribution. Credits are kept in `frontend/public/cars/CREDITS.md`.
+- **Served from the frontend (`/cars/<model>.jpg`), not hotlinked:** Wikimedia rate-limited direct requests (429) while fetching them. V16 lets `image_url` be an https URL or a site-relative `/path`; the dev seed fills it only when it is empty.

@@ -564,3 +564,17 @@ Backend unchanged, not re-run (last: 1361 tests, 0 failures).
 **Open:** not run live (V13–V15 apply on next backend start). No HQ UI for moving a reservation. Stock is consumed at COMPLETE (the workflow's dispatch event), not at DISPATCH_SCHEDULED. Main bundle still > 500 kB.
 
 **Next:** waiting for the next phase prompt.
+
+---
+
+## Fix — catalogue car photos (2026-10-11) ✅
+
+Duster, Kiger, Triber and Kwid photos (Wikimedia Commons, CC BY/BY-SA, credits in `frontend/public/cars/CREDITS.md`) served from `frontend/public/cars`; V16 allows `/path` image URLs; dev seed sets them; admin form accepts them.
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o test -Dtest=DealerPortalApiTest,MigrationSchemaTest,DevDealerPortalSeederTest` | **8 / 10 / 2 passed** |
+| `npm test -- --run --reporter=dot` / `npm run lint` / `npm run build` | **175 passed** / 0 findings / OK (images in `dist/cars`) |
+| `./mvnw -q -o verify` | **exit 0 — 1594 tests, 0 failures, 0 errors** |
+
+**Open:** the licences ask for attribution; the credits file covers the repo, but a visible credit in the UI would be needed before any public use.

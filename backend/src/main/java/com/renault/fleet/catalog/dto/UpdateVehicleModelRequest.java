@@ -15,6 +15,6 @@ public record UpdateVehicleModelRequest(
         @Size(max = 1000) String description,
         BodyType bodyType,
         @Min(1) @Max(60) Integer seatingCapacity,
-        @Size(max = 500) @Pattern(regexp = "^https://\\S+$", message = "must be an https:// URL") String imageUrl,
+        @Size(max = 500) @Pattern(regexp = "^(https://\\S+|/[A-Za-z0-9._/-]+)$", message = "must be an https:// URL or a /path on this site") String imageUrl,
         Boolean active) {
 }

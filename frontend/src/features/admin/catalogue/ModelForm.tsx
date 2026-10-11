@@ -19,7 +19,11 @@ const schema = z.object({
   vehicleCategory: z.string().trim().regex(/^[A-Z][A-Z0-9_]*$/, 'Upper-case letters, digits and _ (the GST category).').max(40),
   bodyType: z.string(),
   seatingCapacity: z.string().refine((v) => v === '' || (/^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 60), 'Between 1 and 60.'),
-  imageUrl: z.string().trim().max(500).refine((v) => v === '' || /^https:\/\/\S+$/.test(v), 'Must be an https:// URL.'),
+  imageUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((v) => v === '' || /^https:\/\/\S+$/.test(v) || /^\/[A-Za-z0-9._/-]+$/.test(v), 'An https:// URL or a /path on this site.'),
   description: z.string().max(1000),
   active: z.boolean(),
 })
@@ -77,7 +81,7 @@ export function ModelForm({ model, onSaved }: { model?: AdminModel; onSaved: (mo
         <TextField name="vehicleCategory" label="GST category" required hint="Key into the tax-rate table, e.g. SUV" />
         <SelectField name="bodyType" label="Body type" placeholder="Not set" options={BODY_TYPES.map((b) => ({ value: b, label: statusLabel(b) }))} />
         <TextField name="seatingCapacity" label="Seats" inputMode="numeric" />
-        <TextField name="imageUrl" label="Image URL" placeholder="https://…" />
+        <TextField name="imageUrl" label="Image URL" placeholder="https://… or /cars/model.jpg" />
       </div>
       <TextareaField name="description" label="Description" rows={3} maxLength={1000} />
       {model && (
