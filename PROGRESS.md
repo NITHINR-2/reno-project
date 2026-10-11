@@ -473,3 +473,23 @@ Waiting for the next phase prompt. Nothing from later phases has been started.
 **Open:** not run live against the dev DB this phase (V11 applies on your next backend start; existing issued quotations freeze on first download). Rate limiter is per instance and trusts only the socket address. Executive Dashboard (6C), bundle splitting, visual check at 360–1440 px remain.
 
 **Next:** waiting for the next phase prompt.
+
+---
+
+## Phase 6C — Executive Dashboard (2026-10-11) ✅
+
+**New dependencies:** frontend `recharts` 3.10.1 + `react-is` 19.3.0 (peer). Backend: none. **Backend:** `analytics` feature — `GET /api/analytics/executive` (MH, SUP) with KPIs + previous period, 12-month value, funnel, time per stage (slowest flagged), top 10 dealers, demand by region/model, stock vs production, all in SQL; V12 history indexes; dev `AnalyticsDemoSeed` (40 consistent backdated requests, 5 more dealers, 2 regions, inactive demo yard); legacy-quotation PDF path now assigns a token if missing. **Frontend:** lazy-loaded Executive Dashboard — URL filters (30 days/Quarter/Year/Custom, region, plant), KPI strip with count-up and good/bad deltas, 6 Recharts widgets with table view + CSV, empty/loading/error states, validated chart colour tokens for light/dark; shared `CountUp`, `lib/csv`.
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o test -Dtest=ExecutiveAnalytics*,AnalyticsDemoSeedTest,MigrationSchemaTest` | Hand-computed API fixture passed 1st time; seed test failed (no request left in review: a full run takes ~7 weeks so nearly all finished) → recent requests keep open stages, newest two await review → passed |
+| `npx vitest --run src/features/analytics` | 2 test-side fixes (split "Slowest" label; 5xx retried once before error) → 9 passed; after lazy-loading, preload in `beforeAll` (30 s budget) |
+| Live: jar (dev) on scratch DB `fleet_p6ccheck`, real seed, API as `marketing.head`, ADMIN → 403 | First seed: 35/41 requests overdue, 16 cancelled → tuned dwell times/model mix → 87% compliance, 21 completed, 8 cancelled, 12 open across 6 stages |
+| Visual: headless Edge screenshots of the real page against that backend (light, dark, 360 px container) | Fixed: Region/Plant selects squeezed at 360 px; Stock card now spans both columns. Only overflow at 360 px is the Demand table scrolling inside its card. Harness files deleted, scratch DB dropped |
+| `./mvnw -q -o verify` (1st) | **1 failure**: Flt0891WalkthroughTest saw 230 eligible Dusters (demo yard was active) → demo yard made inactive |
+| `./mvnw -q -o verify` (final) | **exit 0 — 1361 tests, 0 failures, 0 errors** |
+| `npm test -- --run --reporter=dot` / `npm run lint` / `npm run build` | **16 files, 126 tests passed** / 0 findings / OK (main 811 kB, dashboard chunk 410 kB; size warning remains) |
+
+**Open:** restart your backend to apply V11–V12 and the new dev seed (it adds the demo data once). Main bundle is still >500 kB. Overdue KPI is event-based (breaches recorded in the period), not "currently overdue". All Phase 6 items are done.
+
+**Next:** waiting for the next phase prompt.

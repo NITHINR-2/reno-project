@@ -28,6 +28,11 @@
   --fg: #16191d;
   --fg-muted: #5b636d;
   --accent-fg: #8a6a00;
+  /* Charts: categorical slots 1-2 of the validated data-viz palette (CVD-checked for each surface). */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-grid: #e8eaed;
+  --chart-axis: #5b636d;
   color-scheme: light;
 }
 
@@ -39,6 +44,10 @@
   --fg: #eceef1;
   --fg-muted: #a1a9b3;
   --accent-fg: #f5c400;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-grid: #2c3137;
+  --chart-axis: #a1a9b3;
   color-scheme: dark;
 }
 

@@ -75,7 +75,7 @@ public class QuotationDocumentService {
             // Issued before V11: freeze now from the issued columns, which never change after issue.
             quotation = quotations.findByIdForUpdate(id).orElseThrow();
             if (quotation.getSnapshotJson() == null) {
-                freeze(quotation);
+                freezeOnIssue(quotation); // also assigns a token if the row never got one
                 quotations.saveAndFlush(quotation);
             }
         }

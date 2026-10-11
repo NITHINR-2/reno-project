@@ -1,11 +1,10 @@
 import { BadgeCheck, ClipboardList, Factory, Landmark, Layers, Wrench, type LucideIcon } from 'lucide-react'
-import { animate, motion, useReducedMotion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { motion } from 'motion/react'
 import { Card } from '@/components/ui/Card'
+import { CountUp } from '@/components/ui/CountUp'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { cn } from '@/lib/cn'
-import { formatCount } from '@/lib/format'
 import { duration, ease, staggerDelay } from '@/lib/motion'
 import type { FleetMetrics } from '../api'
 import type { Stage } from '../filters'
@@ -22,18 +21,6 @@ const METRICS: Metric[] = [
   { key: 'inOperations', label: 'Production & dispatch', icon: Factory, stage: 'operations', hint: 'Cleared to dispatch' },
   { key: 'unitsToProduce', label: 'Units to produce', icon: Wrench, hint: 'Across active requests' },
 ]
-
-/** Counts up from 0 on first load; jumps straight to the value with reduced motion. */
-function CountUp({ value }: { value: number }) {
-  const reduce = useReducedMotion()
-  const [shown, setShown] = useState(0)
-  useEffect(() => {
-    if (reduce) return
-    const controls = animate(0, value, { duration: 0.6, ease: ease.out, onUpdate: (v) => setShown(Math.round(v)) })
-    return () => controls.stop()
-  }, [value, reduce])
-  return <>{formatCount(reduce ? value : shown)}</>
-}
 
 export function MetricCards({ activeStage, onSelectStage }: { activeStage?: string; onSelectStage: (stage: Stage) => void }) {
   const { data, isPending, error, refetch } = useFleetSummary()

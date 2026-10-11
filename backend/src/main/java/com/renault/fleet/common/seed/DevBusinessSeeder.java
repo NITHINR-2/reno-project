@@ -38,6 +38,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,12 +77,13 @@ public class DevBusinessSeeder implements ApplicationRunner {
     private final AuditService audit;
     private final Clock clock;
     private final SlaService sla;
+    private final AnalyticsDemoSeed analyticsDemo;
 
     public DevBusinessSeeder(RegionRepository regions, PlantRepository plants, DealerRepository dealers,
             VehicleModelRepository models, VehicleVariantRepository variants, InventoryLocationRepository locations,
             InventoryStockRepository stock, TaxRateRepository taxRates, FleetRequestRepository requests,
             PaymentReceiptRepository receipts, UserRepository users, WorkflowHistoryService history, AuditService audit,
-            Clock clock, SlaService sla) {
+            Clock clock, SlaService sla, AnalyticsDemoSeed analyticsDemo) {
         this.regions = regions;
         this.plants = plants;
         this.dealers = dealers;
@@ -97,6 +99,7 @@ public class DevBusinessSeeder implements ApplicationRunner {
         this.audit = audit;
         this.clock = clock;
         this.sla = sla;
+        this.analyticsDemo = analyticsDemo;
     }
 
     @Override
@@ -139,6 +142,60 @@ public class DevBusinessSeeder implements ApplicationRunner {
         }
 
         seedRequest(chennaiNorth, duster, pune);
+
+        // Executive dashboard demo data: more dealers and regions, and a large yard the demo requests allocate from.
+        Region bengaluru = region("BENGALURU", "Bengaluru Region");
+        Region hyderabad = region("HYDERABAD", "Hyderabad Region");
+        List<Dealer> demoDealers = List.of(chennaiNorth,
+                dealers.findByDealerCode("MUM-WEST").orElseThrow(),
+                dealer("CHN-SOUTH", "Chennai South Motors", chennai, "Chennai", "Tamil Nadu", "33AABCS2345G1Z3", DealerStatus.ACTIVE),
+                dealer("MUM-THANE", "Thane Fleet Renault", mumbai, "Thane", "Maharashtra", "27AABCT3456H1Z4", DealerStatus.ACTIVE),
+                dealer("DEL-GGN", "Gurugram Fleet Centre", delhi, "Gurugram", "Haryana", "06AABCG6789L1Z8", DealerStatus.ACTIVE),
+                dealer("BLR-EAST", "Bengaluru East Autos", bengaluru, "Bengaluru", "Karnataka", "29AABCB4567J1Z6", DealerStatus.ACTIVE),
+                dealer("HYD-HITEC", "Hyderabad Hitec Motors", hyderabad, "Hyderabad", "Telangana", "36AABCH5678K1Z7", DealerStatus.ACTIVE));
+        InventoryLocation demoYard = location("BLR-DEMO-YARD", "Bengaluru Yard (demo history)", LocationType.YARD, bengaluru, null);
+        if (demoYard.isActive()) {
+            // Inactive: it only backs the demo history's allocations and never offers stock to real requests,
+            // so FLT-2026-0891 still sees exactly the 30 Chennai yard units.
+            demoYard.setActive(false);
+            demoYard = locations.save(demoYard);
+        }
+        for (VehicleVariant v : List.of(duster, kiger, triber, kwid)) {
+            stock(demoYard, v, 600);
+        }
+        seedAnalyticsDemo(demoDealers, List.of(duster, kiger, triber, kwid), List.of(pune.getId(),
+                plants.findByCode("CHENNAI").orElseThrow().getId()), demoYard);
+    }
+
+    /** About 40 backdated requests over the last 12 months, across dealers, regions, models and stages. */
+    private void seedAnalyticsDemo(List<Dealer> demoDealers, List<VehicleVariant> demoVariants, List<Long> plantIds,
+            InventoryLocation yard) {
+        if (analyticsDemo.alreadySeeded()) {
+            return;
+        }
+        Optional<User> mm = user("marketing.manager");
+        Optional<User> mh = user("marketing.head");
+        Optional<User> fin = user("finance");
+        Optional<User> sup = user("supervisor");
+        if (mm.isEmpty() || mh.isEmpty() || fin.isEmpty() || sup.isEmpty()) {
+            log.warn("Dev seed: analytics demo needs all four business users; skipped");
+            return;
+        }
+        LocalDate today = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));
+        List<AnalyticsDemoSeed.Variant> variantsWithStock = demoVariants.stream().map(v -> {
+            // Only categories with a GST rate in tax_rates can be quoted (just the Duster's, until Finance confirms more).
+            Optional<TaxRate> rate = taxRates.findEffective(v.getModel().getVehicleCategory(), today);
+            return new AnalyticsDemoSeed.Variant(v.getId(), v.getModel().getName() + " " + v.getName(), v.getUnitPrice(),
+                    rate.map(TaxRate::getId).orElse(null), rate.map(TaxRate::getRate).orElse(null),
+                    stock.findByLocationIdAndVariantId(yard.getId(), v.getId()).orElseThrow().getId());
+        }).toList();
+        List<Long> ids = analyticsDemo.seed(new AnalyticsDemoSeed.Catalog(
+                demoDealers.stream().map(Dealer::getId).toList(), variantsWithStock, plantIds, yard.getId(),
+                new AnalyticsDemoSeed.Actors(mm.get().getId(), mh.get().getId(), fin.get().getId(), sup.get().getId())),
+                40, Instant.now(clock), 6003L);
+        audit.record(AuditEvent.of("DEV_SEED", "FLEET_REQUEST", "analytics-demo")
+                .withReason("dev profile seed: " + ids.size() + " backdated requests for the executive dashboard"));
+        log.info("Dev seed: created {} analytics demo requests", ids.size());
     }
 
     private void seedRequest(Dealer dealer, VehicleVariant variant, Plant plant) {

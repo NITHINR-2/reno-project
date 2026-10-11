@@ -95,6 +95,12 @@ Open http://localhost:5173. The page shows the backend and database health from 
 - The QR code opens `<PUBLIC_BASE_URL>/verify/quotation/<token>` (set `PUBLIC_BASE_URL` in `backend/.env`; default `http://localhost:5173`). That public page calls `GET /api/public/quotations/verify/{token}` (30 requests/min per client address) and shows only the number, issue date, total and status.
 - The terms text comes from `fleet.quotation.default-terms` (placeholder wording; Finance owns it). The PDF uses the bundled DejaVu Sans font (free licence, `backend/src/main/resources/fonts/DejaVu-LICENSE.txt`) for the ₹ sign.
 
+### Executive Dashboard (Phase 6C)
+
+- Sign in as `marketing.head` or `supervisor` → **Executive Dashboard**. Figures come from `GET /api/analytics/executive?from=&to=&region=&plant=`, computed in SQL. Order value is before GST.
+- The dev seed adds ~40 backdated demo requests (last 12 months, several dealers/regions/stages) once, marked "Analytics demo seed" in their notes. Their stock comes from an inactive "Bengaluru Yard (demo history)", so it is never offered to real requests.
+- Filters (period preset or custom dates, region, plant) are in the URL, so a view can be shared. Every widget has a table view and CSV export.
+
 ## Build and test
 
 ```bash

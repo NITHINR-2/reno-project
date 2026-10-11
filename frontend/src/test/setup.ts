@@ -21,6 +21,14 @@ if (!window.matchMedia) {
 }
 window.scrollTo = vi.fn() as unknown as typeof window.scrollTo
 Element.prototype.scrollIntoView = vi.fn()
+// Recharts' ResponsiveContainer observes its size.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+}
 
 afterEach(() => {
   cleanup()

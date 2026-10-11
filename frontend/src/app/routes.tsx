@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { AdminConsolePage } from '@/features/admin/AdminConsolePage'
+import { LazyExecutiveDashboard } from '@/features/analytics/LazyExecutiveDashboard'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ForbiddenPage } from '@/features/errors/ForbiddenPage'
 import { NotFoundPage } from '@/features/errors/NotFoundPage'
@@ -37,6 +38,8 @@ const moduleRoutes: RouteObject[] = NAV_ITEMS.map((item) => ({
     <RequirePermission anyOf={item.anyOf}>
       {item.to === '/admin' ? (
         <AdminConsolePage />
+      ) : item.to === '/executive-dashboard' ? (
+        <LazyExecutiveDashboard />
       ) : FLEET_STAGES[item.to] ? (
         <FleetWorkspace key={item.to} title={item.label} description={DESCRIPTIONS[item.to]} defaultStage={FLEET_STAGES[item.to]} />
       ) : (
