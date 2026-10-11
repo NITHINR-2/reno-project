@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { api, getAccessToken, refreshAccessToken, setAccessToken } from '@/lib/api'
 
-export const ROLES = ['ADMIN', 'SUPERVISOR', 'MARKETING_MANAGER', 'MARKETING_HEAD', 'FINANCE_TEAM'] as const
+export const ROLES = ['ADMIN', 'SUPERVISOR', 'MARKETING_MANAGER', 'MARKETING_HEAD', 'FINANCE_TEAM', 'DEALER'] as const
 export type Role = (typeof ROLES)[number]
 
 export const ROLE_LABELS: Record<Role, string> = {
@@ -10,6 +10,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   MARKETING_MANAGER: 'Marketing Manager',
   MARKETING_HEAD: 'Marketing Head',
   FINANCE_TEAM: 'Finance Team',
+  DEALER: 'Dealer',
 }
 
 export const authUserSchema = z.object({
@@ -19,6 +20,8 @@ export const authUserSchema = z.object({
   email: z.string().nullable().optional(),
   role: z.enum(ROLES),
   permissions: z.array(z.string()),
+  /** Set for DEALER users only; the Dealer Portal API is scoped to it on the server. */
+  dealerId: z.number().nullish(),
 })
 
 export type AuthUser = z.infer<typeof authUserSchema>

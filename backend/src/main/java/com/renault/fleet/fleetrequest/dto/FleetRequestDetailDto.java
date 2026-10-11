@@ -32,6 +32,7 @@ public record FleetRequestDetailDto(
         BigDecimal depositReceived,
         Integer productionEstimateWeeks,
         LocalDate requestedDeliveryDate,
+        String colour,
         String notes,
         String returnReason,
         String cancelReason,

@@ -1,4 +1,4 @@
-import { UserPlus } from 'lucide-react'
+import { Store, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { inputClass } from '@/components/forms/Field'
 import { DataTable, type Column } from '@/components/tables/DataTable'
@@ -9,6 +9,7 @@ import { formatDateTime } from '@/lib/format'
 import type { AdminUser, UserQuery } from './api'
 import { FilterBar, Labeled } from './FilterBar'
 import { useUsers } from './queries'
+import { DealerUserDrawer } from './DealerUserDrawer'
 import { UserDrawer } from './UserDrawer'
 
 const columns: Column<AdminUser>[] = [
@@ -23,6 +24,7 @@ const columns: Column<AdminUser>[] = [
 export function UsersTab() {
   const [query, setQuery] = useState<UserQuery>({ page: 0 })
   const [editing, setEditing] = useState<AdminUser | 'new' | null>(null)
+  const [newDealer, setNewDealer] = useState(false)
   const users = useUsers(query)
   const set = (patch: Partial<UserQuery>) => setQuery((q) => ({ ...q, ...patch, page: 0 }))
 
@@ -30,9 +32,14 @@ export function UsersTab() {
     <>
       <FilterBar
         actions={
-          <Button onClick={() => setEditing('new')} icon={<UserPlus className="size-4" aria-hidden="true" />}>
-            New user
-          </Button>
+          <>
+            <Button variant="secondary" onClick={() => setNewDealer(true)} icon={<Store className="size-4" aria-hidden="true" />}>
+              New dealer user
+            </Button>
+            <Button onClick={() => setEditing('new')} icon={<UserPlus className="size-4" aria-hidden="true" />}>
+              New user
+            </Button>
+          </>
         }
       >
         <Labeled label="Search users">
@@ -74,6 +81,7 @@ export function UsersTab() {
         emptyTitle="No users match"
       />
       <UserDrawer target={editing} onClose={() => setEditing(null)} />
+      <DealerUserDrawer open={newDealer} onClose={() => setNewDealer(false)} />
     </>
   )
 }

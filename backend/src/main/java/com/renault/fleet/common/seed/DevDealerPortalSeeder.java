@@ -3,6 +3,12 @@ package com.renault.fleet.common.seed;
 import com.renault.fleet.audit.service.AuditEvent;
 import com.renault.fleet.audit.service.AuditService;
 import com.renault.fleet.catalog.entity.BodyType;
+import com.renault.fleet.catalog.entity.FuelType;
+import com.renault.fleet.catalog.entity.Transmission;
+import com.renault.fleet.catalog.entity.VehicleColour;
+import com.renault.fleet.catalog.entity.VehicleVariant;
+import com.renault.fleet.catalog.repository.VehicleColourRepository;
+import com.renault.fleet.catalog.repository.VehicleVariantRepository;
 import com.renault.fleet.catalog.entity.VehicleModel;
 import com.renault.fleet.catalog.repository.VehicleModelRepository;
 import com.renault.fleet.dealer.entity.Dealer;
@@ -12,6 +18,8 @@ import com.renault.fleet.user.entity.RoleCode;
 import com.renault.fleet.user.entity.User;
 import com.renault.fleet.user.repository.RoleRepository;
 import com.renault.fleet.user.repository.UserRepository;
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +34,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Dev-only Dealer Portal data, after {@link DevBusinessSeeder}: catalogue text for the seeded models and one DEALER
+ * Dev-only Dealer Portal data, after {@link DevBusinessSeeder}: catalogue text, colours and two automatic variants
+ * for the seeded models, and one DEALER
  * user per seeded dealer ({@code dealer.<code>}, password from {@code DEV_DEALER_PASSWORD}). Idempotent.
  */
 @Component
@@ -38,6 +47,8 @@ public class DevDealerPortalSeeder implements ApplicationRunner {
     static final String PASSWORD_KEY = "DEV_DEALER_PASSWORD";
 
     private final VehicleModelRepository models;
+    private final VehicleVariantRepository variants;
+    private final VehicleColourRepository colourRepository;
     private final DealerRepository dealers;
     private final UserRepository users;
     private final RoleRepository roles;
@@ -45,9 +56,12 @@ public class DevDealerPortalSeeder implements ApplicationRunner {
     private final AuditService audit;
     private final Environment environment;
 
-    public DevDealerPortalSeeder(VehicleModelRepository models, DealerRepository dealers, UserRepository users,
+    public DevDealerPortalSeeder(VehicleModelRepository models, VehicleVariantRepository variants,
+            VehicleColourRepository colourRepository, DealerRepository dealers, UserRepository users,
             RoleRepository roles, PasswordEncoder passwordEncoder, AuditService audit, Environment environment) {
         this.models = models;
+        this.variants = variants;
+        this.colourRepository = colourRepository;
         this.dealers = dealers;
         this.users = users;
         this.roles = roles;
@@ -67,7 +81,34 @@ public class DevDealerPortalSeeder implements ApplicationRunner {
                 "Modular seven-seat MPV for staff transport and shuttles.");
         catalogue("KWID", BodyType.HATCHBACK, 5,
                 "Economical entry hatchback for high-mileage sales and service fleets.");
+        colours("DUSTER", "Pearl White:#F2F2EE", "Moonlight Silver:#B9BCC0", "Mahogany Brown:#5A3328");
+        colours("KIGER", "Ice Cool White:#F4F6F7", "Caspian Blue:#1F4E79", "Radiant Red:#B3202A");
+        colours("TRIBER", "Ice Cool White:#F4F6F7", "Metal Mustard:#C49A2C", "Cedar Brown:#6B4A2E");
+        colours("KWID", "Fiery Red:#C0262D", "Outback Bronze:#7A5C3E", "Zanskar Blue:#2E5C8A");
+        variant("KIGER", "KIGER-RXZ-T-CVT", "Kiger RXZ Turbo CVT", Transmission.CVT, "1099000.00");
+        variant("TRIBER", "TRIBER-RXZ-AMT", "Triber RXZ AMT", Transmission.AMT, "860000.00");
         dealerUsers();
+    }
+
+    /** Adds the colours only if the model has none yet ("Name:#RRGGBB"). */
+    private void colours(String modelCode, String... entries) {
+        models.findByCode(modelCode).ifPresent(model -> {
+            if (!colourRepository.findByModelIdInOrderByName(List.of(model.getId())).isEmpty()) {
+                return;
+            }
+            for (String entry : entries) {
+                String[] parts = entry.split(":");
+                colourRepository.save(new VehicleColour(model, parts[0], parts[1]));
+            }
+        });
+    }
+
+    private void variant(String modelCode, String code, String name, Transmission transmission, String price) {
+        models.findByCode(modelCode).filter(m -> variants.findByCode(code).isEmpty()).ifPresent(model -> {
+            VehicleVariant variant = new VehicleVariant(model, code, name, FuelType.PETROL, new BigDecimal(price));
+            variant.setTransmission(transmission);
+            variants.save(variant);
+        });
     }
 
     private void catalogue(String code, BodyType bodyType, int seats, String description) {

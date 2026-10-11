@@ -63,7 +63,7 @@ describe('Admin sees only the Admin Console', () => {
     expect(router.state.location.pathname).toBe('/admin')
     const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]
     expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['Admin Console'])
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Users', 'Roles', 'Dealers', 'Audit log'])
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Users', 'Roles', 'Dealers', 'Catalogue', 'Audit log'])
     const table = await screen.findByRole('table', { name: 'Users' })
     expect(within(table).getAllByRole('row')).toHaveLength(4)
   })

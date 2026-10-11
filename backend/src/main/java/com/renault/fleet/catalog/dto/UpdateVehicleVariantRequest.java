@@ -1,5 +1,6 @@
 package com.renault.fleet.catalog.dto;
 
+import com.renault.fleet.catalog.entity.Transmission;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -11,5 +12,6 @@ public record UpdateVehicleVariantRequest(
         @NotNull Long version,
         @Size(min = 1, max = 100) String name,
         @DecimalMin("0.01") @Digits(integer = 13, fraction = 2) BigDecimal unitPrice,
-        Boolean active) {
+        Boolean active,
+        Transmission transmission) {
 }

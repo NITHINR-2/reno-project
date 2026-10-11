@@ -1,4 +1,4 @@
-import { BadgeCheck, ChartColumn, ClipboardList, Factory, Landmark, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { BadgeCheck, CarFront, ChartColumn, ClipboardList, Factory, Landmark, Package, ShieldCheck, type LucideIcon } from 'lucide-react'
 import type { AuthUser } from '@/features/auth/api'
 import { hasPermission } from '@/features/auth/useAuth'
 
@@ -18,7 +18,13 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/finance', label: 'Financial Clearance', icon: Landmark, anyOf: ['QUOTATION_ISSUE', 'PAYMENT_APPROVE', 'FINANCE_CLEARANCE'] },
   { to: '/operations', label: 'Production & Dispatch', icon: Factory, anyOf: ['PRODUCTION_SCHEDULE', 'DISPATCH_SCHEDULE'] },
   { to: '/admin', label: 'Admin Console', icon: ShieldCheck, anyOf: ['ADMIN_USERS_MANAGE', 'AUDIT_LOG_READ'] },
+  // Dealer Portal: only DEALER holds DEALER_PORTAL, so dealers see these two and nothing else.
+  { to: '/dealer/catalogue', label: 'Catalogue', icon: CarFront, anyOf: ['DEALER_PORTAL'] },
+  { to: '/dealer/orders', label: 'My Orders', icon: Package, anyOf: ['DEALER_PORTAL'] },
 ]
+
+export const DEALER_HOME = '/dealer/catalogue'
+export const isDealerItem = (item: NavItem) => item.to.startsWith('/dealer/')
 
 export function navFor(user: AuthUser | null | undefined): NavItem[] {
   return NAV_ITEMS.filter((item) => hasPermission(user, ...item.anyOf))

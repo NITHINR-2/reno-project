@@ -7,9 +7,9 @@ type Handler = (config: InternalAxiosRequestConfig) => Reply | Promise<Reply>
 
 export type Call = { method: string; url: string; headers: AxiosHeaders; params: Record<string, unknown>; body: unknown }
 
-/** Mirrors V6__roles_permissions.sql. */
+/** Mirrors V6__seed_roles_permissions.sql and V13__dealer_portal.sql. */
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
-  ADMIN: ['ADMIN_USERS_MANAGE', 'ADMIN_DEALERS_MANAGE', 'AUDIT_LOG_READ'],
+  ADMIN: ['ADMIN_USERS_MANAGE', 'ADMIN_DEALERS_MANAGE', 'AUDIT_LOG_READ', 'CATALOGUE_MANAGE'],
   MARKETING_MANAGER: ['FLEET_REQUEST_READ', 'FLEET_REQUEST_WRITE', 'STOCK_MAP', 'MARKETING_FORWARD'],
   MARKETING_HEAD: ['FLEET_REQUEST_READ', 'EXECUTIVE_APPROVE', 'DEPOSIT_REVIEW', 'EXECUTIVE_DASHBOARD_READ', 'QUOTATION_READ'],
   FINANCE_TEAM: ['FLEET_REQUEST_READ', 'QUOTATION_READ', 'QUOTATION_ISSUE', 'PAYMENT_RECORD', 'PAYMENT_APPROVE', 'FINANCE_CLEARANCE'],
@@ -17,12 +17,21 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     'ADMIN_USERS_MANAGE', 'ADMIN_DEALERS_MANAGE', 'AUDIT_LOG_READ', 'FLEET_REQUEST_READ', 'FLEET_REQUEST_WRITE', 'STOCK_MAP',
     'MARKETING_FORWARD', 'EXECUTIVE_APPROVE', 'DEPOSIT_REVIEW', 'EXECUTIVE_DASHBOARD_READ', 'QUOTATION_READ', 'QUOTATION_ISSUE',
     'PAYMENT_RECORD', 'PAYMENT_APPROVE', 'FINANCE_CLEARANCE', 'PRODUCTION_SCHEDULE', 'DISPATCH_SCHEDULE', 'WORKFLOW_OVERRIDE',
-    'REQUEST_CANCEL', 'REQUEST_REASSIGN', 'SLA_POLICY_MANAGE',
+    'REQUEST_CANCEL', 'REQUEST_REASSIGN', 'SLA_POLICY_MANAGE', 'CATALOGUE_MANAGE',
   ],
+  DEALER: ['DEALER_PORTAL'],
 }
 
 export function userFor(role: Role): AuthUser {
-  return { id: 1, username: role.toLowerCase(), fullName: `Test ${role}`, email: null, role, permissions: ROLE_PERMISSIONS[role] }
+  return {
+    id: 1,
+    username: role.toLowerCase(),
+    fullName: `Test ${role}`,
+    email: null,
+    role,
+    permissions: ROLE_PERMISSIONS[role],
+    dealerId: role === 'DEALER' ? 7 : null,
+  }
 }
 
 /** Installs an Axios adapter answering from `handlers` keyed by "METHOD /path". Unmatched calls get 404. */

@@ -525,3 +525,23 @@ Backend unchanged, not re-run (last: 1361 tests, 0 failures).
 **Open / broken:** the current frontend's `ROLES` enum lacks DEALER, so after V13 the Admin Console Roles tab (and Users tab once dealer users exist) fails to parse — fix first in the frontend phase. No email delivery for set-password links (admin copies the URL). Not run live against the dev DB (V13 applies on your next backend start; add `DEV_DEALER_PASSWORD` to `backend/.env` for dealer logins). Frontend not touched or re-run.
 
 **Next:** waiting for the next phase prompt (Dealer Portal frontend).
+
+---
+
+## Phase D2 — Dealer Portal frontend (+ V14) (2026-10-11) ✅
+
+**No new dependencies.** Decisions approved up front: small backend V14 for transmission/colours, requested-date chip instead of SLA, copy-link instead of email. **Backend (V14):** variant transmission, model colours (+ admin CRUD), `fleet_requests.colour`, catalogue filters (fuel, transmission, price), colour per order line, same variant allowed in two colours. **Frontend:** DEALER role + `/dealer` route group (Catalogue, My Orders, Order detail) behind DEALER_PORTAL, dealers bounced from HQ URLs; catalogue cards (image/placeholder, specs, variant + colour pickers, URL-synced filters); cart drawer (qty, date, notes, remove, confirm, sessionStorage per user); orders table → mobile cards with status badge and requested-date chip; order detail with animated status timeline, quotation + PDF download, payment-proof upload with progress, cancel in review; public `/set-password`; Admin "New dealer user" + one-time link panel, reset links, Catalogue tab.
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o test -Dtest=CatalogueOptionsApiTest,DealerPortalApiTest,DevDealerPortalSeederTest,MigrationSchemaTest` | **4 / 8 / 2 / 8 passed** (migration 14, 27 tables) |
+| `npx vitest --run src/app` | **26 passed** (dealer nav, HQ → portal redirect, HQ 403 on `/dealer`) |
+| `npx vitest --run src/features/dealer` | 1st: 1 test-side timing fix (cancel button appears after detail loads) → **20 passed** |
+| `npx vitest --run …SetPasswordPage.test.tsx …DealerAdmin.test.tsx` | **8 passed** |
+| `npm test -- --run --reporter=dot` (1st) | 1 failure: AdminConsole tab list now includes Catalogue for ADMIN → updated |
+| `npm test -- --run --reporter=dot` / `npm run lint` / `npm run build` | **19 files, 171 tests passed** / 0 findings (after splitting status constants for fast refresh) / OK (main 869 kB, size warning as before) |
+| `./mvnw -q -o verify` | **exit 0 — 1586 tests, 0 failures, 0 errors** |
+
+**Open:** not run live (V13–V14 apply on your next backend start; set `DEV_DEALER_PASSWORD` for `dealer.<code>` logins). No visual check at 360–1440 px this phase. No email delivery. Main bundle still > 500 kB.
+
+**Next:** waiting for the next phase prompt.

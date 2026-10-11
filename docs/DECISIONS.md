@@ -287,3 +287,20 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **Dealer catalogue = active models with at least one active variant; inactive variants are hidden; prices are ex-GST list prices.** Catalogue fields added: description, body type (CHECK list), seating capacity (1–60), https image URL.
 - **Dev seed: one DEALER user per seeded dealer, `dealer.<dealer code>`, sharing `DEV_DEALER_PASSWORD`;** skipped with a warning if unset. Seeded models get catalogue text.
 - **Not done in D1 (backend-only phase):** the current frontend's role enum doesn't know DEALER, so once V13 runs the Admin Console Roles tab (and Users tab, once dealer users exist) will fail to parse — first item for the frontend phase.
+
+## Phase D2 — Dealer Portal, frontend (+ small backend V14) (2026-10-11)
+
+- **Transmission and colours needed backend data, so D2 added a small V14 (approved by the project owner):** `vehicle_variants.transmission` (CHECK MANUAL/AUTOMATIC/AMT/CVT/DCT, default MANUAL), `vehicle_model_colours` (name unique per model case-insensitively, `#RRGGBB`, active flag), `fleet_requests.colour`. Catalogue filters for fuel, transmission and price (min/max, ex-GST) run on the server; a model is listed with only its matching active variants.
+- **The colour name is copied onto the request at order time** so later catalogue edits can't change an order. A colour must belong to the line's model (400) and be active (409). HQ sees it in the fleet request detail.
+- **A variant may appear twice in one order if the colours differ;** the same (variant, colour) twice is still 400. The cart merges identical lines.
+- **No SLA for dealers (approved):** My Orders and Order detail show a "Requested <date>" chip (amber once the date passes on an open order) instead of an SLA countdown, and the timeline is the 8 simplified dealer statuses with the current step highlighted — no internal dates.
+- **No email (approved):** "New dealer user" creates the account without a password and immediately issues the one-time link, shown once with a Copy button. Any active user's drawer can issue a reset link.
+- **`/set-password` reads the token from the URL fragment once, then replaces the URL without it,** and posts it in request bodies only.
+- **DEALER is excluded from the generic "New user" role list and its role can't be edited** (backend 409); dealer accounts come from "New dealer user", which requires a dealership.
+- **Dealers who open an HQ URL are redirected to `/dealer/catalogue`, not shown a 403;** HQ users opening `/dealer/*` still get the 403 page.
+- **The cart is client state in a React context, persisted to sessionStorage per user id** (no secrets; survives a reload, not a new tab). It is cleared after a successful order and kept when the order fails. Its list-price total is labelled an estimate; the HQ quotation is the price.
+- **Cart validation mirrors the server:** 1–20 lines, whole quantities 1–10,000, an optional delivery date after today (IST), notes ≤ 2000. Errors show beside each field and nothing is sent until it passes.
+- **Payment proof checks in the browser mirror the server** (PDF/PNG/JPEG with a matching extension, 1 byte–5 MB) for a quick answer; the server still decides from the bytes. Upload progress comes from Axios `onUploadProgress` and animates `scaleX` only.
+- **Order detail loads each line's detail separately** (≤ 20 lines per order), so quotation, receipts, upload and cancel are per line, matching the API.
+- **Admin Console gets a Catalogue tab (CATALOGUE_MANAGE: ADMIN, SUPERVISOR):** models, variants (price, transmission, on/off sale), colours (add, retire/restore). Nothing is deleted. Writes refresh the admin lists, audit log and dealer catalogue.
+- **Dev seed:** colours for the four models, plus Kiger RXZ Turbo CVT and Triber RXZ AMT so the transmission filter has data. No image URLs are seeded (no real Renault imagery); cards show a neutral car icon.

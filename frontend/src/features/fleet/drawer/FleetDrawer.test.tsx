@@ -7,7 +7,7 @@ import { fakeServer, userFor } from '@/test/fakeServer'
 import { detail, fleetHandlers, page } from '@/test/fleetFixtures'
 import { renderApp } from '@/test/renderApp'
 
-const MODULE: Record<Role, string> = {
+const MODULE: Record<Exclude<Role, 'DEALER'>, string> = {
   ADMIN: '/admin',
   SUPERVISOR: '/operations',
   MARKETING_MANAGER: '/fleet-evaluation',
@@ -15,7 +15,7 @@ const MODULE: Record<Role, string> = {
   FINANCE_TEAM: '/finance',
 }
 
-async function openDrawer(role: Role, status: FleetStatus, allowedActions: string[] = [], extra = {}) {
+async function openDrawer(role: Exclude<Role, 'DEALER'>, status: FleetStatus, allowedActions: string[] = [], extra = {}) {
   const server = fakeServer({ ...fleetHandlers(userFor(role), detail(status, { allowedActions })), ...extra })
   renderApp(`${MODULE[role]}?request=1`)
   const drawer = await screen.findByRole('dialog')
@@ -37,7 +37,7 @@ describe('drawer tabs per role', () => {
     ['MARKETING_HEAD', ['Overview', 'Inventory', 'Finance', 'Payments', 'Workflow', 'Schedule']],
     ['FINANCE_TEAM', ['Overview', 'Inventory', 'Finance', 'Payments', 'Workflow', 'Schedule']],
     ['SUPERVISOR', ['Overview', 'Inventory', 'Finance', 'Payments', 'Workflow', 'Schedule', 'Audit']],
-  ] as [Role, string[]][])('%s sees only the tabs it may read', async (role, tabs) => {
+  ] as [Exclude<Role, 'DEALER'>, string[]][])('%s sees only the tabs it may read', async (role, tabs) => {
     const { drawer } = await openDrawer(role, 'PENDING_MARKETING_REVIEW')
     expect(tabNames(drawer)).toEqual(tabs)
   })

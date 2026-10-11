@@ -29,7 +29,8 @@ public final class DealerPortalDtos {
 
     /** One fleet request (an order line, or a request HQ raised for this dealer). */
     public record Request(Long id, String requestNumber, Long orderId, String orderNumber, Integer lineNo,
-            String modelName, String variantCode, String variantName, int quantity, DealerRequestStatus status,
+            String modelName, String variantCode, String variantName, String colour, int quantity,
+            DealerRequestStatus status,
             LocalDate requestedDeliveryDate, Instant createdAt, boolean canCancel, boolean canUploadPaymentProof,
             Long version) {
     }

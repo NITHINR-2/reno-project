@@ -7,7 +7,7 @@ import { fakeServer, userFor } from '@/test/fakeServer'
 import { detail, fleetHandlers, page } from '@/test/fleetFixtures'
 import { renderApp } from '@/test/renderApp'
 
-const MODULE: Record<Role, string> = {
+const MODULE: Record<Exclude<Role, 'DEALER'>, string> = {
   ADMIN: '/admin',
   SUPERVISOR: '/operations',
   MARKETING_MANAGER: '/fleet-evaluation',
@@ -17,7 +17,7 @@ const MODULE: Record<Role, string> = {
 
 type Handlers = Parameters<typeof fakeServer>[0]
 
-async function openDrawer(role: Role, status: FleetStatus, allowedActions: string[], extra: Handlers = {}) {
+async function openDrawer(role: Exclude<Role, 'DEALER'>, status: FleetStatus, allowedActions: string[], extra: Handlers = {}) {
   const server = fakeServer({ ...fleetHandlers(userFor(role), detail(status, { allowedActions })), ...extra })
   renderApp(`${MODULE[role]}?request=1`)
   const drawer = await screen.findByRole('dialog')
@@ -50,7 +50,7 @@ describe('workflow action buttons per role and state', () => {
     ['FINANCE_TEAM', 'PAYMENT_PENDING', ['AWAIT_PAYMENT', 'VERIFY_FUNDS'], ['Receipts…']],
     ['MARKETING_HEAD', 'PAYMENT_PENDING', [], []],
     ['MARKETING_HEAD', 'PENDING_MARKETING_REVIEW', [], []],
-  ] as [Role, FleetStatus, string[], string[]][])('%s in %s sees %j', async (role, status, allowed, buttons) => {
+  ] as [Exclude<Role, 'DEALER'>, FleetStatus, string[], string[]][])('%s in %s sees %j', async (role, status, allowed, buttons) => {
     const { drawer } = await openDrawer(role, status, allowed)
     expect(actionNames(drawer)).toEqual(buttons)
   })

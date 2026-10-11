@@ -2,6 +2,7 @@ package com.renault.fleet.catalog.dto;
 
 import com.renault.fleet.catalog.entity.BodyType;
 import com.renault.fleet.catalog.entity.FuelType;
+import com.renault.fleet.catalog.entity.Transmission;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -14,8 +15,13 @@ public record CatalogueModelDto(
         BodyType bodyType,
         Integer seatingCapacity,
         String imageUrl,
-        List<Variant> variants) {
+        List<Variant> variants,
+        List<Colour> colours) {
 
-    public record Variant(Long id, String code, String name, FuelType fuelType, BigDecimal unitPrice) {
+    public record Variant(Long id, String code, String name, FuelType fuelType, Transmission transmission,
+            BigDecimal unitPrice) {
+    }
+
+    public record Colour(Long id, String name, String hexCode) {
     }
 }

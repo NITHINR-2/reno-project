@@ -1,6 +1,8 @@
 package com.renault.fleet.catalog.controller;
 
+import com.renault.fleet.catalog.dto.ColourRequest;
 import com.renault.fleet.catalog.dto.CreateVehicleModelRequest;
+import com.renault.fleet.catalog.dto.UpdateColourRequest;
 import com.renault.fleet.catalog.dto.CreateVehicleVariantRequest;
 import com.renault.fleet.catalog.dto.UpdateVehicleModelRequest;
 import com.renault.fleet.catalog.dto.UpdateVehicleVariantRequest;
@@ -78,6 +80,21 @@ public class CatalogueAdminController {
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
         VehicleModelDto.Variant created = service.createVariant(id, body, principal);
         return ResponseEntity.created(URI.create("/api/admin/catalogue/variants/" + created.id())).body(created);
+    }
+
+    @PostMapping("/models/{id}/colours")
+    @Operation(summary = "Add a colour to a model (name unique per model, hex #RRGGBB)")
+    public ResponseEntity<VehicleModelDto.Colour> createColour(@PathVariable Long id, @Valid @RequestBody ColourRequest body,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
+        VehicleModelDto.Colour created = service.createColour(id, body, principal);
+        return ResponseEntity.created(URI.create("/api/admin/catalogue/colours/" + created.id())).body(created);
+    }
+
+    @PatchMapping("/colours/{id}")
+    @Operation(summary = "Rename, recolour or (de)activate a colour")
+    public VehicleModelDto.Colour updateColour(@PathVariable Long id, @Valid @RequestBody UpdateColourRequest body,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
+        return service.updateColour(id, body, principal);
     }
 
     @PatchMapping("/variants/{id}")

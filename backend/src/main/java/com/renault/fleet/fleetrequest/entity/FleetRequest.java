@@ -100,6 +100,10 @@ public class FleetRequest extends BaseEntity {
 
     private Integer dealerOrderLineNo;
 
+    /** Colour name chosen on a dealer order line, copied from the catalogue at order time (V14). */
+    @Column(length = 50)
+    private String colour;
+
     protected FleetRequest() {
     }
 
@@ -176,6 +180,8 @@ public class FleetRequest extends BaseEntity {
     }
     public DealerOrder getDealerOrder() { return dealerOrder; }
     public Integer getDealerOrderLineNo() { return dealerOrderLineNo; }
+    public String getColour() { return colour; }
+    public void setColour(String colour) { this.colour = colour; }
     public Instant getStockMappedAt() { return stockMappedAt; }
     public User getStockMappedBy() { return stockMappedBy; }
 }

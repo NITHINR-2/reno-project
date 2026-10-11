@@ -16,6 +16,7 @@ export const userSchema = z.object({
   lastLoginAt: z.string().nullish(),
   version: z.number(),
   createdAt: z.string(),
+  dealerId: z.number().nullish(),
 })
 export type AdminUser = z.infer<typeof userSchema>
 
@@ -80,7 +81,11 @@ export type UserQuery = { page: number; q?: string; role?: string; active?: stri
 export type DealerQuery = { page: number; q?: string; regionId?: string; status?: string }
 export type AuditQuery = { page: number; actorUsername?: string; action?: string; entityType?: string; entityId?: string; from?: string; to?: string }
 
-export type CreateUserBody = { username: string; email: string; fullName: string; role: string; password: string }
+/** HQ users need a password; DEALER users need a dealerId and set their own password through a link. */
+export type CreateUserBody = { username: string; email: string; fullName: string; role: string; password?: string; dealerId?: number }
+
+export const setPasswordLinkSchema = z.object({ userId: z.number(), username: z.string(), url: z.string(), expiresAt: z.string() })
+export type SetPasswordLink = z.infer<typeof setPasswordLinkSchema>
 export type UpdateUserBody = { version: number; email?: string; fullName?: string; role?: string }
 export type DealerBody = {
   dealerCode?: string
@@ -116,6 +121,8 @@ export const adminApi = {
     slaPolicySchema.parse((await api.patch<unknown>(`/admin/sla-policies/${id}`, body)).data),
 
   createUser: async (body: CreateUserBody) => userSchema.parse((await api.post<unknown>('/admin/users', body)).data),
+  setPasswordLink: async (id: number) => setPasswordLinkSchema.parse((await api.post<unknown>(`/admin/users/${id}/set-password-link`, {})).data),
+  dealerOptions: () => getPage('/dealers', dealerSchema, { size: 100, sort: 'name' }),
   updateUser: async (id: number, body: UpdateUserBody) => userSchema.parse((await api.patch<unknown>(`/admin/users/${id}`, body)).data),
   setActive: async (id: number, active: boolean) =>
     userSchema.parse((await api.post<unknown>(`/admin/users/${id}/${active ? 'activate' : 'deactivate'}`, {})).data),

@@ -29,6 +29,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 class DevDealerPortalSeederTest {
 
     @Autowired private VehicleModelRepository models;
+    @Autowired private com.renault.fleet.catalog.repository.VehicleVariantRepository variants;
+    @Autowired private com.renault.fleet.catalog.repository.VehicleColourRepository colours;
     @Autowired private DealerRepository dealers;
     @Autowired private UserRepository users;
     @Autowired private RoleRepository roles;
@@ -41,7 +43,7 @@ class DevDealerPortalSeederTest {
     void createsOneDealerUserPerDealerOnce() {
         Dealer dealer = data.world().dealer();
         MockEnvironment env = new MockEnvironment().withProperty(DevDealerPortalSeeder.PASSWORD_KEY, "Dev-Dealer-Pass-1");
-        DevDealerPortalSeeder seeder = new DevDealerPortalSeeder(models, dealers, users, roles, passwordEncoder, audit, env);
+        DevDealerPortalSeeder seeder = new DevDealerPortalSeeder(models, variants, colours, dealers, users, roles, passwordEncoder, audit, env);
 
         tx.executeWithoutResult(s -> seeder.run(new DefaultApplicationArguments()));
         long after = users.count();
@@ -58,7 +60,7 @@ class DevDealerPortalSeederTest {
     void withoutThePasswordNoDealerUsersAreCreated() {
         long before = users.count();
         data.world();
-        new DevDealerPortalSeeder(models, dealers, users, roles, passwordEncoder, audit, new MockEnvironment())
+        new DevDealerPortalSeeder(models, variants, colours, dealers, users, roles, passwordEncoder, audit, new MockEnvironment())
                 .run(new DefaultApplicationArguments());
         assertThat(users.count()).isEqualTo(before);
     }

@@ -13,6 +13,7 @@ const EXPECTED: Record<Role, { nav: string[]; home: string }> = {
   MARKETING_MANAGER: { nav: ['Fleet Evaluation'], home: '/fleet-evaluation' },
   MARKETING_HEAD: { nav: ['Executive Approval', 'Executive Dashboard'], home: '/executive-approval' },
   FINANCE_TEAM: { nav: ['Financial Clearance'], home: '/finance' },
+  DEALER: { nav: ['Catalogue', 'My Orders'], home: '/dealer/catalogue' },
 }
 
 async function navLinks() {
@@ -63,6 +64,23 @@ describe('forbidden URLs', () => {
     expect(await screen.findByText(/403 — You don't have access/)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/forbidden')
     expect(screen.getByText(path)).toBeInTheDocument()
+  })
+
+  it.each(['/fleet-evaluation', '/finance', '/admin', '/executive-dashboard', '/operations'])(
+    'DEALER visiting the HQ route %s is sent back to the Dealer Portal',
+    async (path) => {
+      fakeServer({ ...sessionHandlers(userFor('DEALER')), 'GET /dealer/catalogue': () => [200, { content: [], page: 0, size: 12, totalElements: 0, totalPages: 0 }] })
+      const { router } = renderApp(path)
+      expect(await screen.findByRole('heading', { name: 'Catalogue', level: 1 })).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/dealer/catalogue')
+    },
+  )
+
+  it.each(['ADMIN', 'SUPERVISOR', 'FINANCE_TEAM'] as Role[])('%s visiting the Dealer Portal gets the 403 page', async (role) => {
+    fakeServer(sessionHandlers(userFor(role)))
+    const { router } = renderApp('/dealer/orders')
+    expect(await screen.findByText(/403 — You don't have access/)).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/forbidden')
   })
 
   it('SUPERVISOR can open every module', async () => {

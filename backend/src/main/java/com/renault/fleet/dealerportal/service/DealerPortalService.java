@@ -2,6 +2,9 @@ package com.renault.fleet.dealerportal.service;
 
 import com.renault.fleet.audit.service.AuditEvent;
 import com.renault.fleet.audit.service.AuditService;
+import com.renault.fleet.catalog.entity.VehicleColour;
+import com.renault.fleet.catalog.entity.VehicleVariant;
+import com.renault.fleet.catalog.repository.VehicleColourRepository;
 import com.renault.fleet.common.api.PageResponse;
 import com.renault.fleet.common.error.BadRequestException;
 import com.renault.fleet.common.error.ConflictException;
@@ -32,6 +35,7 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,6 +68,7 @@ public class DealerPortalService {
     private final PaymentReceiptRepository receipts;
     private final PaymentProofRepository proofs;
     private final FleetRequestService fleetRequests;
+    private final VehicleColourRepository colours;
     private final WorkflowService workflow;
     private final DealerPortalMapper mapper;
     private final AuditService audit;
@@ -72,7 +77,8 @@ public class DealerPortalService {
 
     public DealerPortalService(DealerOrderRepository orders, FleetRequestRepository requests, DealerRepository dealers,
             UserRepository users, QuotationRepository quotations, PaymentReceiptRepository receipts,
-            PaymentProofRepository proofs, FleetRequestService fleetRequests, WorkflowService workflow,
+            PaymentProofRepository proofs, FleetRequestService fleetRequests, VehicleColourRepository colours,
+            WorkflowService workflow,
             DealerPortalMapper mapper, AuditService audit, JsonMapper jsonMapper, Clock clock) {
         this.orders = orders;
         this.requests = requests;
@@ -82,6 +88,7 @@ public class DealerPortalService {
         this.receipts = receipts;
         this.proofs = proofs;
         this.fleetRequests = fleetRequests;
+        this.colours = colours;
         this.workflow = workflow;
         this.mapper = mapper;
         this.audit = audit;
@@ -103,10 +110,10 @@ public class DealerPortalService {
         if (dealer.getStatus() != DealerStatus.ACTIVE) {
             throw new ConflictException("Your dealership is " + dealer.getStatus() + "; only ACTIVE dealers can order.");
         }
-        Set<Long> seen = new HashSet<>();
+        Set<List<Long>> seen = new HashSet<>();
         for (CreateDealerOrderRequest.Line line : body.lines()) {
-            if (!seen.add(line.variantId())) {
-                throw new BadRequestException("Variant " + line.variantId() + " appears more than once; combine the lines.");
+            if (!seen.add(Arrays.asList(line.variantId(), line.colourId()))) {
+                throw new BadRequestException("Variant " + line.variantId() + " appears more than once in the same colour; combine the lines.");
             }
         }
         String notes = body.notes() == null || body.notes().isBlank() ? null : body.notes().strip();
@@ -115,7 +122,9 @@ public class DealerPortalService {
         List<FleetRequest> lines = new ArrayList<>();
         for (int i = 0; i < body.lines().size(); i++) {
             CreateDealerOrderRequest.Line line = body.lines().get(i);
-            lines.add(fleetRequests.createForDealerOrder(order, i + 1, line.variantId(), line.quantity(), actor));
+            VehicleVariant variant = fleetRequests.activeVariant(line.variantId());
+            lines.add(fleetRequests.createForDealerOrder(order, i + 1, variant, colourFor(variant, line.colourId()),
+                    line.quantity(), actor));
         }
         DealerPortalDtos.OrderDetail dto = mapper.toDetail(order, lines);
         audit.record(AuditEvent.of("CREATE", "DEALER_ORDER", String.valueOf(order.getId()))
@@ -194,6 +203,20 @@ public class DealerPortalService {
     public FleetRequest ownRequest(Long id, AuthenticatedUser actor) {
         return requests.findByIdAndDealerId(id, dealerId(actor))
                 .orElseThrow(() -> new NotFoundException("Request " + id + " not found."));
+    }
+
+    private String colourFor(VehicleVariant variant, Long colourId) {
+        if (colourId == null) {
+            return null;
+        }
+        VehicleColour colour = colours.findById(colourId)
+                .filter(c -> c.getModel().getId().equals(variant.getModel().getId()))
+                .orElseThrow(() -> new BadRequestException("Colour " + colourId + " is not offered for "
+                        + variant.getModel().getName() + "."));
+        if (!colour.isActive()) {
+            throw new ConflictException("Colour " + colour.getName() + " is no longer available.");
+        }
+        return colour.getName();
     }
 
     private Map<Long, List<FleetRequest>> linesOf(List<Long> orderIds) {

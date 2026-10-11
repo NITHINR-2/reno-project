@@ -6,18 +6,20 @@ import { Tabs, type TabItem } from '@/components/ui/Tabs'
 import { hasPermission, useAuthUser } from '@/features/auth/useAuth'
 import { fade } from '@/lib/motion'
 import { AuditLogTab } from './AuditLogTab'
+import { CatalogueTab } from './catalogue/CatalogueTab'
 import { DealersTab } from './DealersTab'
 import { RolesTab } from './RolesTab'
 import { SlaPoliciesTab } from './SlaPoliciesTab'
 import { UsersTab } from './UsersTab'
 
-type AdminTab = 'users' | 'roles' | 'dealers' | 'audit' | 'sla'
+type AdminTab = 'users' | 'roles' | 'dealers' | 'catalogue' | 'audit' | 'sla'
 
 /** Tabs follow the permissions; the server checks each call again. */
 const TABS: (TabItem<AdminTab> & { anyOf: string[] })[] = [
   { id: 'users', label: 'Users', anyOf: ['ADMIN_USERS_MANAGE'] },
   { id: 'roles', label: 'Roles', anyOf: ['ADMIN_USERS_MANAGE'] },
   { id: 'dealers', label: 'Dealers', anyOf: ['ADMIN_DEALERS_MANAGE'] },
+  { id: 'catalogue', label: 'Catalogue', anyOf: ['CATALOGUE_MANAGE'] },
   { id: 'audit', label: 'Audit log', anyOf: ['AUDIT_LOG_READ'] },
   { id: 'sla', label: 'SLA', anyOf: ['SLA_POLICY_MANAGE'] },
 ]
@@ -31,7 +33,7 @@ export function AdminConsolePage() {
 
   return (
     <>
-      <PageHeader title="Admin Console" description="Users, roles, dealer onboarding, the audit log and SLA policies." />
+      <PageHeader title="Admin Console" description="Users, roles, dealer onboarding, the catalogue, the audit log and SLA policies." />
       <Card>
         <Tabs
           tabs={tabs}
@@ -46,6 +48,7 @@ export function AdminConsolePage() {
             {active === 'users' && <UsersTab />}
             {active === 'roles' && <RolesTab />}
             {active === 'dealers' && <DealersTab />}
+            {active === 'catalogue' && <CatalogueTab />}
             {active === 'audit' && <AuditLogTab />}
             {active === 'sla' && <SlaPoliciesTab />}
           </motion.div>

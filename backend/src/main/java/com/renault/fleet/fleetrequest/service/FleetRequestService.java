@@ -122,11 +122,12 @@ public class FleetRequestService {
      * Marketing sets both during review. The caller has checked that the dealer is ACTIVE and owns the order.
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    public FleetRequest createForDealerOrder(DealerOrder order, int lineNo, Long variantId, int quantity,
-            AuthenticatedUser actor) {
-        FleetRequest request = new FleetRequest(nextRequestNumber(), order.getDealer(), activeVariant(variantId),
-                quantity, users.getReferenceById(actor.id()));
+    public FleetRequest createForDealerOrder(DealerOrder order, int lineNo, VehicleVariant variant, String colour,
+            int quantity, AuthenticatedUser actor) {
+        FleetRequest request = new FleetRequest(nextRequestNumber(), order.getDealer(), variant, quantity,
+                users.getReferenceById(actor.id()));
         request.linkToDealerOrder(order, lineNo);
+        request.setColour(colour);
         request.setRequestedDeliveryDate(order.getRequestedDeliveryDate());
         request.setNotes(order.getNotes());
         persistNew(request, actor);
@@ -191,7 +192,9 @@ public class FleetRequestService {
         return "FLT-%d-%04d".formatted(year, repository.nextRequestNumber());
     }
 
-    private VehicleVariant activeVariant(Long variantId) {
+    /** The variant with its model, or 404; 409 if it or its model is inactive. */
+    @Transactional(readOnly = true)
+    public VehicleVariant activeVariant(Long variantId) {
         VehicleVariant variant = variants.findWithModelById(variantId)
                 .orElseThrow(() -> new NotFoundException("Vehicle variant " + variantId + " not found."));
         if (!variant.isActive() || !variant.getModel().isActive()) {

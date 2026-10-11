@@ -3,7 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { AuthUserContext, hasPermission, useAuthUser, useCurrentUser } from '@/features/auth/useAuth'
-import { navFor } from './navigation'
+import { DEALER_HOME, navFor } from './navigation'
 
 function FullPageLoading() {
   return (
@@ -43,6 +43,8 @@ export function RequirePermission({ anyOf, children }: { anyOf: string[]; childr
   const user = useAuthUser()
   const location = useLocation()
   if (!hasPermission(user, ...anyOf)) {
+    // Dealers have no HQ modules: send them back to the portal instead of a 403 page.
+    if (hasPermission(user, 'DEALER_PORTAL')) return <Navigate to={DEALER_HOME} replace />
     return <Navigate to="/forbidden" replace state={{ from: location.pathname }} />
   }
   return children

@@ -30,6 +30,10 @@ public class VehicleVariant extends BaseEntity {
     @Column(nullable = false, length = 20)
     private FuelType fuelType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Transmission transmission = Transmission.MANUAL;
+
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal unitPrice;
 
@@ -52,6 +56,8 @@ public class VehicleVariant extends BaseEntity {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public FuelType getFuelType() { return fuelType; }
+    public Transmission getTransmission() { return transmission; }
+    public void setTransmission(Transmission transmission) { this.transmission = transmission; }
     public BigDecimal getUnitPrice() { return unitPrice; }
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
     public boolean isActive() { return active; }

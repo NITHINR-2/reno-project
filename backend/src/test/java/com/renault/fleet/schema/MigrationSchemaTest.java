@@ -51,13 +51,13 @@ class MigrationSchemaTest {
     void allMigrationsAppliedAndNothingPending() {
         assertThat(flyway.info().pending()).isEmpty();
         MigrationInfo current = flyway.info().current();
-        assertThat(current.getVersion().getVersion()).isEqualTo("13");
+        assertThat(current.getVersion().getVersion()).isEqualTo("14");
 
         List<String> tables = jdbc.queryForList("""
                 select table_name from information_schema.tables
                 where table_schema = 'public' and table_type = 'BASE TABLE' and table_name <> 'flyway_schema_history'
                 """, String.class);
-        assertThat(tables).hasSize(26).contains("dealer_orders", "set_password_tokens", "payment_proofs", "tax_rates", "refresh_tokens", "fleet_requests", "quotations", "audit_logs", "sla_policies");
+        assertThat(tables).hasSize(27).contains("vehicle_model_colours", "dealer_orders", "set_password_tokens", "payment_proofs", "tax_rates", "refresh_tokens", "fleet_requests", "quotations", "audit_logs", "sla_policies");
     }
 
     @Test

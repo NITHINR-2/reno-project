@@ -12,8 +12,9 @@ import { useToast } from '@/components/ui/useToast'
 import { ROLE_LABELS, ROLES, type Role } from '@/features/auth/api'
 import { useAuthUser } from '@/features/auth/useAuth'
 import { reportError } from '@/lib/reportError'
-import type { AdminUser } from './api'
-import { useCreateUser, useSetUserActive, useUpdateUser } from './queries'
+import type { AdminUser, SetPasswordLink } from './api'
+import { useCreateUser, useSetPasswordLink, useSetUserActive, useUpdateUser } from './queries'
+import { SetPasswordLinkPanel } from './SetPasswordLinkPanel'
 
 // Mirrors CreateUserRequest / UpdateUserRequest; the server re-validates and enforces the role rules.
 const base = { email: z.string().trim().email('Enter a valid email.').max(255), fullName: z.string().trim().min(1, 'Enter a name.').max(150), role: z.enum(ROLES) }
@@ -38,9 +39,12 @@ export function UserDrawer({ target, onClose }: Props) {
   )
 }
 
-/** Only a Supervisor may grant SUPERVISOR or manage Supervisor accounts (server rule, mirrored). */
+/**
+ * Only a Supervisor may grant SUPERVISOR or manage Supervisor accounts (server rule, mirrored). DEALER accounts are
+ * created from "New dealer user" (they need a dealership) and can't change role, so DEALER is never offered here.
+ */
 function roleOptions(viewerRole: Role) {
-  return ROLES.filter((r) => viewerRole === 'SUPERVISOR' || r !== 'SUPERVISOR').map((r) => ({ value: r, label: ROLE_LABELS[r] }))
+  return ROLES.filter((r) => r !== 'DEALER' && (viewerRole === 'SUPERVISOR' || r !== 'SUPERVISOR')).map((r) => ({ value: r, label: ROLE_LABELS[r] }))
 }
 
 function CreateUserForm({ onDone }: { onDone: () => void }) {
@@ -90,8 +94,11 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
     resolver: zodResolver(editSchema),
     defaultValues: { email: user.email, fullName: user.fullName, role: user.role },
   })
+  const issueLink = useSetPasswordLink()
+  const [link, setLink] = useState<SetPasswordLink>()
   const self = viewer.id === user.id
   const protectedAccount = user.role === 'SUPERVISOR' && viewer.role !== 'SUPERVISOR'
+  const dealerAccount = user.role === 'DEALER'
 
   return (
     <>
@@ -106,7 +113,7 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
         className="space-y-4"
         onSubmit={(v) =>
           update.mutate(
-            { id: user.id, version: user.version, email: v.email, fullName: v.fullName, role: self ? undefined : v.role },
+            { id: user.id, version: user.version, email: v.email, fullName: v.fullName, role: self || dealerAccount ? undefined : v.role },
             {
               onSuccess: () => {
                 toast.success('User updated', user.username)
@@ -120,7 +127,14 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
         <fieldset disabled={protectedAccount} className="space-y-4">
           <TextField name="fullName" label="Full name" required />
           <TextField name="email" label="Email" type="email" required />
-          <SelectField name="role" label="Role" required disabled={self} options={protectedAccount ? [{ value: 'SUPERVISOR', label: ROLE_LABELS.SUPERVISOR }] : roleOptions(viewer.role)} />
+          <SelectField
+            name="role"
+            label="Role"
+            required
+            disabled={self || dealerAccount}
+            hint={dealerAccount ? 'Dealer accounts keep their role.' : undefined}
+            options={protectedAccount || dealerAccount ? [{ value: user.role, label: ROLE_LABELS[user.role] }] : roleOptions(viewer.role)}
+          />
         </fieldset>
         <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-between">
           <Button variant={user.active ? 'danger' : 'secondary'} disabled={self || protectedAccount} onClick={() => setConfirming(true)}>
@@ -131,6 +145,24 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
           </Button>
         </div>
       </Form>
+      {!self && !protectedAccount && user.active && (
+        <div className="mt-6 space-y-3 border-t border-line pt-4">
+          <p className="text-sm text-fg-muted">
+            {dealerAccount ? 'Send the dealer a one-time link to set (or reset) their password.' : 'Reset the password with a one-time link.'}
+          </p>
+          {link ? (
+            <SetPasswordLinkPanel link={link} />
+          ) : (
+            <Button
+              variant="secondary"
+              loading={issueLink.isPending}
+              onClick={() => issueLink.mutate(user.id, { onSuccess: setLink, onError: (e) => reportError(toast, e) })}
+            >
+              Issue set-password link
+            </Button>
+          )}
+        </div>
+      )}
       <ConfirmDialog
         open={confirming}
         title={user.active ? `Deactivate ${user.username}?` : `Activate ${user.username}?`}

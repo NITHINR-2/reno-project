@@ -78,6 +78,7 @@ public class FleetRequestMapper {
                 depositReceived,
                 r.getProductionEstimateWeeks(),
                 r.getRequestedDeliveryDate(),
+                r.getColour(),
                 r.getNotes(),
                 r.getReturnReason(),
                 r.getCancelReason(),

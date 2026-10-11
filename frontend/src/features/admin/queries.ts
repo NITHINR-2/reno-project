@@ -28,6 +28,8 @@ function useAdminMutation<V, R>(fn: (v: V) => Promise<R>, ...collections: QueryK
 }
 
 export const useCreateUser = () => useAdminMutation((b: CreateUserBody) => adminApi.createUser(b), adminKeys.users())
+export const useSetPasswordLink = () => useAdminMutation((id: number) => adminApi.setPasswordLink(id))
+export const useDealerOptions = () => useQuery({ queryKey: ['admin', 'dealer-options'], queryFn: adminApi.dealerOptions, staleTime: 60_000 })
 export const useUpdateUser = () => useAdminMutation(({ id, ...b }: UpdateUserBody & { id: number }) => adminApi.updateUser(id, b), adminKeys.users())
 export const useSetUserActive = () =>
   useAdminMutation(({ id, active }: { id: number; active: boolean }) => adminApi.setActive(id, active), adminKeys.users())
