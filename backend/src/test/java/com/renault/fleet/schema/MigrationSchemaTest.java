@@ -51,7 +51,7 @@ class MigrationSchemaTest {
     void allMigrationsAppliedAndNothingPending() {
         assertThat(flyway.info().pending()).isEmpty();
         MigrationInfo current = flyway.info().current();
-        assertThat(current.getVersion().getVersion()).isEqualTo("14");
+        assertThat(current.getVersion().getVersion()).isEqualTo("15");
 
         List<String> tables = jdbc.queryForList("""
                 select table_name from information_schema.tables
@@ -96,12 +96,33 @@ class MigrationSchemaTest {
                 """, requestId, taxRateId, userId)).isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    // Each test runs in one transaction, so each checks a single constraint violation.
     @Test
-    void stockCannotGoNegative() {
-        long locationId = id("insert into inventory_locations (code, name, location_type) values ('T-YARD', 'Yard', 'YARD') returning id");
-        long stockId = id("insert into inventory_stock (location_id, variant_id, quantity_available) values (?, ?, 30) returning id", locationId, variantId);
-        assertThatThrownBy(() -> jdbc.update("update inventory_stock set quantity_available = quantity_available - 31 where id = ?", stockId))
+    void reservedCannotExceedOnHand() {
+        long stockId = stock(30);
+        assertThatThrownBy(() -> jdbc.update("update inventory_stock set reserved = 31 where id = ?", stockId))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void reservedCannotGoNegative() {
+        long stockId = stock(30);
+        assertThatThrownBy(() -> jdbc.update("update inventory_stock set reserved = -1 where id = ?", stockId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void onHandCannotDropBelowReservedAndAvailableIsDerived() {
+        long stockId = stock(30);
+        jdbc.update("update inventory_stock set reserved = 30 where id = ?", stockId);
+        assertThat(jdbc.queryForObject("select available from inventory_stock where id = ?", Integer.class, stockId)).isZero();
+        assertThatThrownBy(() -> jdbc.update("update inventory_stock set on_hand = 29 where id = ?", stockId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private long stock(int onHand) {
+        long locationId = id("insert into inventory_locations (code, name, location_type) values ('T-YARD', 'Yard', 'YARD') returning id");
+        return id("insert into inventory_stock (location_id, variant_id, on_hand) values (?, ?, ?) returning id", locationId, variantId, onHand);
     }
 
     @Test

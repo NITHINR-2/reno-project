@@ -198,8 +198,7 @@ public class AnalyticsDemoSeed {
         if (stage.equals("CANCELLED") && allocated > 0) {
             jdbc.update("update stock_allocations set status = 'RELEASED', released_at = ? where fleet_request_id = ?",
                     ts(t), id);
-            jdbc.update("update inventory_stock set quantity_available = quantity_available + ?, "
-                    + "quantity_allocated = quantity_allocated - ? where id = ?", allocated, allocated, variant.stockId());
+            jdbc.update("update inventory_stock set reserved = reserved - ? where id = ?", allocated, variant.stockId());
             allocated = 0;
         }
         if (completedAt != null) {
@@ -257,8 +256,7 @@ public class AnalyticsDemoSeed {
     private void allocate(Catalog c, long id, Variant v, int qty, Instant at) {
         jdbc.update("insert into stock_allocations (fleet_request_id, stock_id, quantity, allocated_by_id, created_at, "
                 + "updated_at) values (?, ?, ?, ?, ?, ?)", id, v.stockId(), qty, c.actors().marketingManager(), ts(at), ts(at));
-        jdbc.update("update inventory_stock set quantity_available = quantity_available - ?, "
-                + "quantity_allocated = quantity_allocated + ? where id = ?", qty, qty, v.stockId());
+        jdbc.update("update inventory_stock set reserved = reserved + ? where id = ?", qty, v.stockId());
         jdbc.update("update fleet_requests set stock_mapped_at = ?, stock_mapped_by_id = ? where id = ?", ts(at),
                 c.actors().marketingManager(), id);
     }
@@ -321,8 +319,8 @@ public class AnalyticsDemoSeed {
     private void finish(Catalog c, long id, Variant v, int allocated, Instant at) {
         if (allocated > 0) {
             jdbc.update("update stock_allocations set status = 'CONSUMED' where fleet_request_id = ? and status = 'ACTIVE'", id);
-            jdbc.update("update inventory_stock set quantity_allocated = quantity_allocated - ? where id = ?",
-                    allocated, v.stockId());
+            jdbc.update("update inventory_stock set on_hand = on_hand - ?, reserved = reserved - ? where id = ?",
+                    allocated, allocated, v.stockId());
         }
         jdbc.update("update production_orders set status = 'COMPLETED', completed_at = ? where fleet_request_id = ?",
                 ts(at.minus(Duration.ofDays(3))), id);

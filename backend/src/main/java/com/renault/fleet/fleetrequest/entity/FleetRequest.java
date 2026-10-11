@@ -2,6 +2,7 @@ package com.renault.fleet.fleetrequest.entity;
 
 import com.renault.fleet.catalog.entity.VehicleVariant;
 import com.renault.fleet.common.persistence.BaseEntity;
+import com.renault.fleet.catalog.entity.VehicleColour;
 import com.renault.fleet.dealer.entity.Dealer;
 import com.renault.fleet.dealerportal.entity.DealerOrder;
 import com.renault.fleet.fleetrequest.service.ProductionCalculator;
@@ -104,6 +105,11 @@ public class FleetRequest extends BaseEntity {
     @Column(length = 50)
     private String colour;
 
+    /** The catalogue colour row (V15); stock is reserved only from rows of the same colour. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "colour_id")
+    private VehicleColour colourOption;
+
     protected FleetRequest() {
     }
 
@@ -181,7 +187,12 @@ public class FleetRequest extends BaseEntity {
     public DealerOrder getDealerOrder() { return dealerOrder; }
     public Integer getDealerOrderLineNo() { return dealerOrderLineNo; }
     public String getColour() { return colour; }
-    public void setColour(String colour) { this.colour = colour; }
+    public VehicleColour getColourOption() { return colourOption; }
+    /** Sets the colour row and its name snapshot together (null clears both). */
+    public void setColour(VehicleColour option) {
+        this.colourOption = option;
+        this.colour = option == null ? null : option.getName();
+    }
     public Instant getStockMappedAt() { return stockMappedAt; }
     public User getStockMappedBy() { return stockMappedBy; }
 }

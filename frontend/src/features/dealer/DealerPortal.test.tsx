@@ -1,12 +1,14 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { focusManager } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeServer, sessionHandlers, userFor } from '@/test/fakeServer'
 import { page } from '@/test/fleetFixtures'
 import { renderApp } from '@/test/renderApp'
 import { todayIST } from '@/lib/format'
 import { validateCart } from './cart/cartRules'
 import { MAX_PROOF_BYTES, proofFileError } from './orders/proofRules'
+import { AVAILABILITY_REFRESH_MS } from './queries'
 
 type Handlers = Parameters<typeof fakeServer>[0]
 
@@ -28,6 +30,20 @@ const DUSTER = {
   ],
 }
 
+const PLANTS = [
+  { id: 1, code: 'PUNE', name: 'Pune Plant', city: 'Pune', state: 'Maharashtra' },
+  { id: 2, code: 'BANGALORE', name: 'Bangalore Plant', city: 'Bengaluru', state: 'Karnataka' },
+]
+/** Pune: 4 white RXZ Petrol, 2 silver RXZ Automatic. Bangalore: 1 silver RXZ Automatic. */
+const availability = (plantId: number) => ({
+  plantId,
+  asOf: '2026-10-11T05:00:00Z',
+  items:
+    plantId === 1
+      ? [{ variantId: 11, colourId: 21, available: 4 }, { variantId: 12, colourId: 22, available: 2 }]
+      : [{ variantId: 12, colourId: 22, available: 1 }],
+})
+
 const line = (extra = {}) => ({
   id: 501,
   requestNumber: 'FLT-2026-1001',
@@ -44,6 +60,9 @@ const line = (extra = {}) => ({
   createdAt: '2026-10-11T05:00:00Z',
   canCancel: true,
   canUploadPaymentProof: false,
+  plantName: 'Pune Plant',
+  fromStock: 3,
+  toProduce: 2,
   version: 0,
   ...extra,
 })
@@ -53,6 +72,8 @@ function dealerServer(extra: Handlers = {}) {
   return fakeServer({
     ...sessionHandlers(userFor('DEALER')),
     'GET /dealer/catalogue': () => [200, page([DUSTER])],
+    'GET /dealer/plants': () => [200, PLANTS],
+    'GET /dealer/catalogue/availability': (config) => [200, availability(Number((config.params as { plantId: number }).plantId))],
     'GET /dealer/orders/99': () => [200, order([line()])],
     'GET /dealer/requests/501': () => [200, { request: line(), quotation: null, receipts: [] }],
     ...extra,
@@ -124,7 +145,8 @@ describe('Catalogue and cart', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/dealer/orders/99'))
     expect(posts(server, '/dealer/orders')).toHaveLength(1)
     expect(posts(server, '/dealer/orders')[0].body).toEqual({
-      lines: [{ variantId: 12, quantity: 5, colourId: 22 }],
+      plantId: 1,
+      lines: [{ variantId: 12, quantity: 5, colourId: 22, expectedFromStock: 2 }],
       requestedDeliveryDate: '2099-01-15',
     })
     expect(JSON.parse(sessionStorage.getItem('fleet-cart:1') ?? '{}').lines).toEqual([])
@@ -140,6 +162,107 @@ describe('Catalogue and cart', () => {
     await u.click(within(await screen.findByRole('dialog', { name: 'Your cart' })).getByRole('button', { name: 'Place order' }))
     await u.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Place order' }))
     expect(await screen.findByText(/is not active/)).toBeInTheDocument()
+    expect(posts(server, '/dealer/orders')).toHaveLength(1)
+    expect(JSON.parse(sessionStorage.getItem('fleet-cart:1') ?? '{}').lines).toHaveLength(1)
+  })
+})
+
+describe('Plants and live stock', () => {
+  const availabilityCalls = (server: ReturnType<typeof fakeServer>) =>
+    server.calls.filter((c) => c.method === 'GET' && c.url === '/dealer/catalogue/availability').length
+
+  it('shows stock at the chosen plant and lowers it as units go into the cart, without calling the API', async () => {
+    const server = dealerServer()
+    const u = userEvent.setup()
+    renderApp('/dealer/catalogue')
+    const card = (await screen.findByRole('heading', { name: 'Renault Duster' })).closest('article') as HTMLElement
+    expect(await within(card).findByText('4 available at Pune Plant')).toBeInTheDocument()
+    const calls = availabilityCalls(server)
+
+    const qty = within(card).getByLabelText('Quantity')
+    await u.clear(qty)
+    await u.type(qty, '3')
+    await u.click(within(card).getByRole('button', { name: 'Add Renault Duster to cart' }))
+    expect(within(card).getByText('1 available at Pune Plant')).toBeInTheDocument()
+    await u.click(within(card).getByRole('button', { name: 'Add Renault Duster to cart' }))
+    expect(within(card).getByText('None free at Pune Plant — made to order')).toBeInTheDocument()
+    expect(availabilityCalls(server)).toBe(calls)
+
+    // Another plant, another count (the cart now orders from Bangalore).
+    await u.selectOptions(screen.getByLabelText('Order from plant'), '2')
+    await u.click(within(card).getByRole('radio', { name: 'Moonlight Silver' }))
+    await u.click(within(card).getByRole('radio', { name: /Duster RXZ Automatic/ }))
+    expect(await within(card).findByText('1 available at Bangalore Plant')).toBeInTheDocument()
+  })
+
+  it('refetches availability on window focus and every 15 seconds', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const server = dealerServer()
+      renderApp('/dealer/catalogue')
+      await screen.findByText('4 available at Pune Plant')
+      const first = availabilityCalls(server)
+      act(() => {
+        focusManager.setFocused(false)
+        focusManager.setFocused(true)
+      })
+      await waitFor(() => expect(availabilityCalls(server)).toBe(first + 1))
+      await act(() => vi.advanceTimersByTimeAsync(AVAILABILITY_REFRESH_MS))
+      await waitFor(() => expect(availabilityCalls(server)).toBeGreaterThanOrEqual(first + 2))
+    } finally {
+      focusManager.setFocused(undefined)
+      vi.useRealTimers()
+    }
+  })
+
+  it('on a 409 shows "Only N available" and can order N from stock with the rest produced', async () => {
+    let attempt = 0
+    const server = dealerServer({
+      'POST /dealer/orders': () =>
+        ++attempt === 1
+          ? [409, { title: 'Stock Changed', status: 409, detail: 'Only 1 available', plantId: 1,
+              lines: [{ lineNo: 1, variantId: 11, colourId: 21, quantity: 3, expectedFromStock: 3, available: 1 }] }]
+          : [201, order([line({ quantity: 3, fromStock: 1, toProduce: 2 })])],
+    })
+    const u = userEvent.setup()
+    const { router } = renderApp('/dealer/catalogue')
+    const card = (await screen.findByRole('heading', { name: 'Renault Duster' })).closest('article') as HTMLElement
+    await within(card).findByText('4 available at Pune Plant')
+    const qty = within(card).getByLabelText('Quantity')
+    await u.clear(qty)
+    await u.type(qty, '3')
+    await u.click(within(card).getByRole('button', { name: 'Add Renault Duster to cart' }))
+    await u.click(screen.getByRole('button', { name: 'Open cart, 3 units' }))
+    const drawer = await screen.findByRole('dialog', { name: 'Your cart' })
+    expect(within(drawer).getByText('3 from stock at Pune Plant')).toBeInTheDocument()
+    await u.click(within(drawer).getByRole('button', { name: 'Place order' }))
+    await u.click(within(await screen.findByRole('alertdialog', { name: 'Place this order?' })).getByRole('button', { name: 'Place order' }))
+
+    const dialog = await screen.findByRole('alertdialog', { name: 'Only 1 available' })
+    expect(within(dialog).getByText(/1 of the 3 you asked for can come from stock/)).toBeInTheDocument()
+    expect(posts(server, '/dealer/orders')[0].body).toMatchObject({ plantId: 1, lines: [{ variantId: 11, quantity: 3, expectedFromStock: 3 }] })
+    await u.click(within(dialog).getByRole('button', { name: 'Order 1 from stock, rest produced' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dealer/orders/99'))
+    expect(posts(server, '/dealer/orders')).toHaveLength(2)
+    expect(posts(server, '/dealer/orders')[1].body).toMatchObject({ lines: [{ variantId: 11, quantity: 3, expectedFromStock: 1 }] })
+  })
+
+  it('"Edit quantity" closes the dialog and keeps the cart for editing', async () => {
+    const server = dealerServer({
+      'POST /dealer/orders': () => [409, { title: 'Stock Changed', status: 409, plantId: 1,
+        lines: [{ lineNo: 1, variantId: 11, colourId: 21, quantity: 1, expectedFromStock: 1, available: 0 }] }],
+    })
+    const u = userEvent.setup()
+    renderApp('/dealer/catalogue')
+    await u.click(await screen.findByRole('button', { name: 'Add Renault Duster to cart' }))
+    await u.click(screen.getByRole('button', { name: 'Open cart, 1 units' }))
+    await u.click(within(await screen.findByRole('dialog', { name: 'Your cart' })).getByRole('button', { name: 'Place order' }))
+    await u.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Place order' }))
+    const dialog = await screen.findByRole('alertdialog', { name: 'Only 0 available' })
+    await u.click(within(dialog).getByRole('button', { name: 'Edit quantity' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('dialog', { name: 'Your cart' })).toBeInTheDocument()
     expect(posts(server, '/dealer/orders')).toHaveLength(1)
     expect(JSON.parse(sessionStorage.getItem('fleet-cart:1') ?? '{}').lines).toHaveLength(1)
   })

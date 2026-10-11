@@ -60,6 +60,9 @@ const requestSchema = z.object({
   variantName: z.string(),
   colour: z.string().nullish(),
   quantity: z.number(),
+  plantName: z.string().nullish(),
+  fromStock: z.number(),
+  toProduce: z.number(),
   status: z.enum(DEALER_STATUSES),
   requestedDeliveryDate: z.string().nullish(),
   createdAt: z.string(),
@@ -128,6 +131,39 @@ export const requestDetailSchema = z.object({
 })
 export type RequestDetail = z.infer<typeof requestDetailSchema>
 
+export const plantSchema = z.object({ id: z.number(), code: z.string(), name: z.string(), city: z.string(), state: z.string() })
+export type Plant = z.infer<typeof plantSchema>
+
+export const availabilitySchema = z.object({
+  plantId: z.number(),
+  asOf: z.string(),
+  items: z.array(z.object({ variantId: z.number(), colourId: z.number().nullish(), available: z.number() })),
+})
+export type PlantAvailability = z.infer<typeof availabilitySchema>
+
+/** Free units of a variant in a colour (or uncoloured) at the plant, from the last availability fetch. */
+export function availableFor(data: PlantAvailability | undefined, variantId: number, colourId: number | undefined): number | undefined {
+  if (!data) return undefined
+  const item = data.items.find((i) => i.variantId === variantId && (i.colourId ?? undefined) === colourId)
+  return item?.available ?? 0
+}
+
+/** The 409 body when the plant's stock changed between display and order (one entry per short line). */
+export const stockConflictSchema = z.object({
+  plantId: z.number(),
+  lines: z.array(
+    z.object({
+      lineNo: z.number(),
+      variantId: z.number(),
+      colourId: z.number().nullish(),
+      quantity: z.number(),
+      expectedFromStock: z.number(),
+      available: z.number(),
+    }),
+  ),
+})
+export type StockConflict = z.infer<typeof stockConflictSchema>
+
 export type CatalogueQuery = {
   page: number
   q?: string
@@ -138,8 +174,8 @@ export type CatalogueQuery = {
   maxPrice?: string
 }
 export type OrderQuery = { page: number; q?: string }
-export type OrderLineBody = { variantId: number; quantity: number; colourId?: number }
-export type CreateOrderBody = { lines: OrderLineBody[]; requestedDeliveryDate?: string; notes?: string }
+export type OrderLineBody = { variantId: number; quantity: number; colourId?: number; expectedFromStock?: number }
+export type CreateOrderBody = { plantId?: number; lines: OrderLineBody[]; requestedDeliveryDate?: string; notes?: string }
 export type ReceiptBody = {
   receiptType: (typeof RECEIPT_TYPES)[number]
   paymentMethod: (typeof PAYMENT_METHODS)[number]
@@ -157,6 +193,9 @@ async function getPage<T extends z.ZodType>(url: string, item: T, params: object
 
 export const dealerApi = {
   catalogue: (q: CatalogueQuery) => getPage('/dealer/catalogue', catalogueModelSchema, { size: 12, sort: 'name', ...q }),
+  plants: async () => z.array(plantSchema).parse((await api.get<unknown>('/dealer/plants')).data),
+  availability: async (plantId: number) =>
+    availabilitySchema.parse((await api.get<unknown>('/dealer/catalogue/availability', { params: { plantId } })).data),
   orders: (q: OrderQuery) => getPage('/dealer/orders', orderSummarySchema, { size: 20, ...q }),
   order: async (id: number) => orderDetailSchema.parse((await api.get<unknown>(`/dealer/orders/${id}`)).data),
   request: async (id: number) => requestDetailSchema.parse((await api.get<unknown>(`/dealer/requests/${id}`)).data),

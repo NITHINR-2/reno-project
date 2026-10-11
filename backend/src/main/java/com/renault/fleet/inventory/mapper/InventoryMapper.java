@@ -18,7 +18,8 @@ public class InventoryMapper {
         InventoryLocation location = s.getLocation();
         return new InventoryStockDto(s.getId(), location.getId(), location.getCode(), location.getName(),
                 location.getLocationType(), s.getVariant().getId(), s.getVariant().getCode(), s.getVariant().getName(),
-                s.getQuantityAvailable(), s.getQuantityAllocated(), s.getVersion());
+                s.getQuantityAvailable(), s.getQuantityAllocated(), s.getVersion(), s.getOnHand(),
+                s.getColour() == null ? null : s.getColour().getId(), s.getColour() == null ? null : s.getColour().getName());
     }
 
     public InventoryLocationDto toLocation(InventoryLocation l) {

@@ -187,7 +187,7 @@ public class DevBusinessSeeder implements ApplicationRunner {
             Optional<TaxRate> rate = taxRates.findEffective(v.getModel().getVehicleCategory(), today);
             return new AnalyticsDemoSeed.Variant(v.getId(), v.getModel().getName() + " " + v.getName(), v.getUnitPrice(),
                     rate.map(TaxRate::getId).orElse(null), rate.map(TaxRate::getRate).orElse(null),
-                    stock.findByLocationIdAndVariantId(yard.getId(), v.getId()).orElseThrow().getId());
+                    stock.findByLocationIdAndVariantIdAndColourIsNull(yard.getId(), v.getId()).orElseThrow().getId());
         }).toList();
         List<Long> ids = analyticsDemo.seed(new AnalyticsDemoSeed.Catalog(
                 demoDealers.stream().map(Dealer::getId).toList(), variantsWithStock, plantIds, yard.getId(),
@@ -277,7 +277,7 @@ public class DevBusinessSeeder implements ApplicationRunner {
     }
 
     private void stock(InventoryLocation location, VehicleVariant variant, int quantity) {
-        if (stock.findByLocationIdAndVariantId(location.getId(), variant.getId()).isEmpty()) {
+        if (stock.findByLocationIdAndVariantIdAndColourIsNull(location.getId(), variant.getId()).isEmpty()) {
             stock.save(new InventoryStock(location, variant, quantity));
         }
     }

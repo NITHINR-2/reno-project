@@ -205,18 +205,26 @@ class FleetRequestWorkflowApiTest {
                 .andExpect(jsonPath("$.status").value("RETURNED_TO_MARKETING"))
                 .andExpect(jsonPath("$.returnReason").value("Needs a smaller allocation"))
                 .andExpect(jsonPath("$.allowedActions").isEmpty());
+        // The rejection released the stock mapping, so Marketing must map again before re-qualifying.
         call(Endpoint.RESUBMIT, id, RoleCode.MARKETING_MANAGER)
                 .andExpect(jsonPath("$.status").value("PENDING_MARKETING_REVIEW"))
+                .andExpect(jsonPath("$.stockMappedAt").doesNotExist())
+                .andExpect(jsonPath("$.allowedActions").isEmpty());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/fleet-requests/{id}/stock-allocations", id)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"lines\":[]}")
+                        .header(HttpHeaders.AUTHORIZATION, sessions.get(RoleCode.MARKETING_MANAGER).bearer()))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.allowedActions[0]").value("QUALIFY"));
         call(Endpoint.SUBMIT_FOR_QUALIFICATION, id, RoleCode.MARKETING_MANAGER)
                 .andExpect(jsonPath("$.status").value("MARKETING_QUALIFIED"));
         call(Endpoint.FORWARD_TO_MARKETING_HEAD, id, RoleCode.MARKETING_MANAGER)
                 .andExpect(jsonPath("$.status").value("PENDING_EXECUTIVE_APPROVAL"));
 
-        assertThat(historyRepository.countByFleetRequestId(id)).isEqualTo(4);
+        assertThat(historyRepository.countByFleetRequestId(id)).isEqualTo(5);
         assertThat(auditLogs.findByEntityTypeAndEntityIdOrderById("FLEET_REQUEST", id.toString()))
                 .extracting(AuditLog::getAction)
-                .containsExactly("WORKFLOW_REJECT", "WORKFLOW_RESUBMIT", "WORKFLOW_QUALIFY", "WORKFLOW_FORWARD_TO_EXECUTIVE");
+                .containsExactly("WORKFLOW_REJECT", "WORKFLOW_RESUBMIT", "STOCK_MAPPED", "WORKFLOW_QUALIFY", "WORKFLOW_FORWARD_TO_EXECUTIVE");
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .get("/api/fleet-requests/{id}/history", id)
                         .header(HttpHeaders.AUTHORIZATION, sessions.get(RoleCode.FINANCE_TEAM).bearer()))
@@ -224,7 +232,7 @@ class FleetRequestWorkflowApiTest {
                 .andExpect(jsonPath("$.content[0].action").value("REJECT"))
                 .andExpect(jsonPath("$.content[0].reason").value("Needs a smaller allocation"))
                 .andExpect(jsonPath("$.content[0].actorRole").value("MARKETING_HEAD"))
-                .andExpect(jsonPath("$.content[3].toStatus").value("PENDING_EXECUTIVE_APPROVAL"));
+                .andExpect(jsonPath("$.content[4].toStatus").value("PENDING_EXECUTIVE_APPROVAL"));
     }
 
     private ResultActions call(Endpoint endpoint, Long id, RoleCode role) throws Exception {

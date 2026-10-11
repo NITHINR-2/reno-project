@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -61,6 +62,19 @@ public class DealerPortalController {
     public PageResponse<CatalogueModelDto> catalogue(@ParameterObject CatalogueFilter filter,
             @ParameterObject @PageableDefault(size = 20, sort = "name") Pageable pageable) {
         return catalogue.catalogue(filter, pageable);
+    }
+
+    @GetMapping("/plants")
+    @Operation(summary = "Plants the dealer can order from")
+    public java.util.List<DealerPortalDtos.Plant> plants(@Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
+        return portal.plants(principal);
+    }
+
+    @GetMapping("/catalogue/availability")
+    @Operation(summary = "Free units per variant and colour at a plant (display only; orders re-check under lock)")
+    public ResponseEntity<DealerPortalDtos.PlantAvailability> availability(@RequestParam Long plantId,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(portal.availability(plantId, principal));
     }
 
     @PostMapping("/orders")

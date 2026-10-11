@@ -4,6 +4,7 @@ import com.renault.fleet.common.api.PageResponse;
 import com.renault.fleet.fleetrequest.dto.FleetRequestDetailDto;
 import com.renault.fleet.inventory.dto.InventoryStockDto;
 import com.renault.fleet.inventory.dto.MapStockRequest;
+import com.renault.fleet.inventory.dto.MoveReservationRequest;
 import com.renault.fleet.inventory.service.InventoryService;
 import com.renault.fleet.inventory.service.StockAllocationService;
 import com.renault.fleet.security.AuthenticatedUser;
@@ -19,6 +20,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -53,5 +55,15 @@ public class StockAllocationController {
     public FleetRequestDetailDto mapStock(@PathVariable Long id, @Valid @RequestBody MapStockRequest body,
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
         return allocations.mapStock(id, body, principal);
+    }
+
+    @PostMapping("/move-reservation")
+    @PreAuthorize("hasAuthority('STOCK_MAP')")
+    @Operation(summary = "Move the request's stock reservation to another plant (audited)",
+            description = "Releases everything the request holds and reserves min(quantity, available) of the same variant "
+                    + "and colour at the target plant; production required is recomputed. PENDING_MARKETING_REVIEW only.")
+    public FleetRequestDetailDto moveReservation(@PathVariable Long id, @Valid @RequestBody MoveReservationRequest body,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
+        return allocations.moveReservation(id, body, principal);
     }
 }

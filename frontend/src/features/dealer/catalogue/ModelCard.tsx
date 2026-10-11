@@ -1,4 +1,4 @@
-import { CarFront, Check, Plus, Users } from 'lucide-react'
+import { CarFront, Check, Plus, Users, Warehouse } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useId, useState } from 'react'
 import { inputClass } from '@/components/forms/Field'
@@ -8,12 +8,13 @@ import { useToast } from '@/components/ui/useToast'
 import { cn } from '@/lib/cn'
 import { formatINR, statusLabel } from '@/lib/format'
 import { duration, ease } from '@/lib/motion'
-import type { CatalogueModel } from '../api'
-import { useCart } from '../cart/cartContext'
+import { availableFor, type CatalogueModel, type PlantAvailability } from '../api'
+import { unitsInCart, useCart } from '../cart/cartContext'
 import { MAX_QUANTITY } from '../cart/cartRules'
 
 /** One catalogue model: pick a variant, a colour and a quantity, then add it to the cart. */
-export function ModelCard({ model }: { model: CatalogueModel }) {
+/** {@code availability} is the selected plant's free stock; the card subtracts what is already in the cart. */
+export function ModelCard({ model, availability, plantName }: { model: CatalogueModel; availability?: PlantAvailability; plantName?: string }) {
   const cart = useCart()
   const toast = useToast()
   const [variantId, setVariantId] = useState(model.variants[0]?.id)
@@ -24,6 +25,9 @@ export function ModelCard({ model }: { model: CatalogueModel }) {
   const variant = model.variants.find((v) => v.id === variantId) ?? model.variants[0]
   const colour = model.colours.find((c) => c.id === colourId)
   const lowest = Math.min(...model.variants.map((v) => v.unitPrice))
+  // Display only: the server re-checks under row locks when the order is placed.
+  const atPlant = availableFor(availability, variant.id, colour?.id)
+  const left = atPlant === undefined ? undefined : Math.max(0, atPlant - unitsInCart(cart.lines, variant.id, colour?.id))
 
   function addToCart() {
     const qty = Number(quantity)
@@ -124,6 +128,13 @@ export function ModelCard({ model }: { model: CatalogueModel }) {
               ))}
             </div>
           </fieldset>
+        )}
+
+        {plantName && left !== undefined && (
+          <p aria-live="polite" className={cn('flex items-center gap-1.5 text-sm', left > 0 ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400')}>
+            <Warehouse className="size-4" aria-hidden="true" />
+            {left > 0 ? `${left} available at ${plantName}` : `None free at ${plantName} — made to order`}
+          </p>
         )}
 
         <div className="mt-auto flex items-end gap-2">

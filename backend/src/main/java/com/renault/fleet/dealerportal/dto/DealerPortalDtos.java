@@ -30,9 +30,20 @@ public final class DealerPortalDtos {
     /** One fleet request (an order line, or a request HQ raised for this dealer). */
     public record Request(Long id, String requestNumber, Long orderId, String orderNumber, Integer lineNo,
             String modelName, String variantCode, String variantName, String colour, int quantity,
-            DealerRequestStatus status,
+            String plantName, int fromStock, int toProduce, DealerRequestStatus status,
             LocalDate requestedDeliveryDate, Instant createdAt, boolean canCancel, boolean canUploadPaymentProof,
             Long version) {
+    }
+
+    /** A plant a dealer can order from. */
+    public record Plant(Long id, String code, String name, String city, String state) {
+    }
+
+    /** Free units of one variant (in one colour, or uncoloured when {@code colourId} is null) at a plant right now. */
+    public record Availability(Long variantId, Long colourId, long available) {
+    }
+
+    public record PlantAvailability(Long plantId, java.time.Instant asOf, List<Availability> items) {
     }
 
     public record RequestDetail(Request request, Quotation quotation, List<Receipt> receipts) {

@@ -41,7 +41,9 @@ export function CartProvider({ userId, children }: { userId: number; children: R
       remove: (key) => setState((s) => ({ ...s, lines: s.lines.filter((l) => l.key !== key) })),
       setDeliveryDate: (requestedDeliveryDate) => setState((s) => ({ ...s, requestedDeliveryDate })),
       setNotes: (notes) => setState((s) => ({ ...s, notes })),
-      clear: () => setState(EMPTY_CART),
+      setPlant: (plantId) => setState((s) => ({ ...s, plantId })),
+      // The plant choice outlives an order: the next order is usually from the same plant.
+      clear: () => setState((s) => ({ ...EMPTY_CART, plantId: s.plantId })),
     }),
     [state, isOpen, add],
   )
@@ -58,6 +60,7 @@ function load(storageKey: string): CartState {
       lines: Array.isArray(parsed.lines) ? parsed.lines : [],
       requestedDeliveryDate: typeof parsed.requestedDeliveryDate === 'string' ? parsed.requestedDeliveryDate : '',
       notes: typeof parsed.notes === 'string' ? parsed.notes : '',
+      plantId: typeof parsed.plantId === 'number' ? parsed.plantId : undefined,
     }
   } catch {
     return EMPTY_CART

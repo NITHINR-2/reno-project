@@ -13,7 +13,8 @@ export type CartLine = {
   quantity: number
 }
 
-export type CartState = { lines: CartLine[]; requestedDeliveryDate: string; notes: string }
+/** One cart = one order from one plant; the catalogue's plant picker sets {@code plantId}. */
+export type CartState = { lines: CartLine[]; requestedDeliveryDate: string; notes: string; plantId?: number }
 
 export type CartApi = CartState & {
   count: number
@@ -26,10 +27,15 @@ export type CartApi = CartState & {
   remove: (key: string) => void
   setDeliveryDate: (date: string) => void
   setNotes: (notes: string) => void
+  setPlant: (plantId: number) => void
   clear: () => void
 }
 
 export const EMPTY_CART: CartState = { lines: [], requestedDeliveryDate: '', notes: '' }
+
+/** Units of a variant in a colour already in the cart (they come out of the same plant's stock). */
+export const unitsInCart = (lines: CartLine[], variantId: number, colourId?: number) =>
+  lines.filter((l) => l.variantId === variantId && l.colourId === colourId).reduce((sum, l) => sum + (Number.isFinite(l.quantity) ? l.quantity : 0), 0)
 
 export const lineKey = (variantId: number, colourId?: number) => `${variantId}:${colourId ?? '-'}`
 

@@ -47,8 +47,12 @@ public class TransitionEffects {
     public Map<String, Object> apply(FleetRequest request, WorkflowAction action, String reason) {
         return switch (action) {
             case REJECT -> {
+                // The returned request gives its reserved stock back; Marketing re-maps (or moves) it on resubmit.
+                // Release first: it flushes, and the request should change (and bump its version) only once.
+                int released = stockAllocations.releaseAll(request);
                 request.setReturnReason(reason);
-                yield Map.of();
+                request.clearStockMapping();
+                yield Map.of("releasedUnits", released);
             }
             case CANCEL -> cancel(request, reason);
             case COMPLETE -> complete(request);
@@ -58,9 +62,9 @@ public class TransitionEffects {
 
     /** Releases stock and voids open documents. Approved money stays recorded (refunds are out of scope). */
     private Map<String, Object> cancel(FleetRequest request, String reason) {
-        request.setCancelReason(reason);
         Map<String, Object> meta = new LinkedHashMap<>();
-        meta.put("releasedUnits", stockAllocations.releaseAll(request));
+        meta.put("releasedUnits", stockAllocations.releaseAll(request)); // before the request changes (see REJECT)
+        request.setCancelReason(reason);
         int voided = 0;
         for (QuotationStatus status : EnumSet.of(QuotationStatus.DRAFT, QuotationStatus.ISSUED)) {
             for (Quotation q : quotations.findByFleetRequestIdAndStatus(request.getId(), status)) {

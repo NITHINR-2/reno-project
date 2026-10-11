@@ -8,7 +8,24 @@ export const dealerKeys = {
   orders: (q?: OrderQuery) => (q ? (['dealer', 'orders', q] as const) : (['dealer', 'orders'] as const)),
   order: (id: number) => ['dealer', 'order', id] as const,
   request: (id: number) => ['dealer', 'request', id] as const,
+  plants: ['dealer', 'plants'] as const,
+  availability: (plantId: number) => ['dealer', 'availability', plantId] as const,
 }
+
+export const AVAILABILITY_REFRESH_MS = 15_000
+
+export const usePlants = () => useQuery({ queryKey: dealerKeys.plants, queryFn: dealerApi.plants, staleTime: 5 * 60_000 })
+
+/** Live-ish stock at a plant: refreshed every 15 s and whenever the window regains focus. Display only. */
+export const usePlantAvailability = (plantId: number | undefined) =>
+  useQuery({
+    queryKey: dealerKeys.availability(plantId ?? 0),
+    queryFn: () => dealerApi.availability(plantId as number),
+    enabled: plantId !== undefined,
+    refetchInterval: AVAILABILITY_REFRESH_MS,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  })
 
 export const useCatalogue = (q: CatalogueQuery) =>
   useQuery({ queryKey: dealerKeys.catalogue(q), queryFn: () => dealerApi.catalogue(q), placeholderData: keepPreviousData })
@@ -21,7 +38,9 @@ export function useCreateOrder() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: CreateOrderBody) => dealerApi.createOrder(body),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: dealerKeys.orders() }),
+    // An order (or a 409) changes what the plant has free, so availability is refetched too.
+    onSettled: () =>
+      Promise.all([dealerKeys.orders(), ['dealer', 'availability']].map((queryKey) => queryClient.invalidateQueries({ queryKey }))),
   })
 }
 

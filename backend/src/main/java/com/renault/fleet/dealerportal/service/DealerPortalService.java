@@ -6,6 +6,15 @@ import com.renault.fleet.catalog.entity.VehicleColour;
 import com.renault.fleet.catalog.entity.VehicleVariant;
 import com.renault.fleet.catalog.repository.VehicleColourRepository;
 import com.renault.fleet.common.api.PageResponse;
+import com.renault.fleet.common.error.ApiException;
+import com.renault.fleet.inventory.entity.InventoryStock;
+import com.renault.fleet.inventory.repository.InventoryStockRepository;
+import org.springframework.data.domain.Sort;
+import com.renault.fleet.inventory.service.StockAllocationService;
+import com.renault.fleet.production.entity.Plant;
+import com.renault.fleet.production.repository.PlantRepository;
+import com.renault.fleet.workflow.service.WorkflowHistoryService;
+import org.springframework.http.HttpStatus;
 import com.renault.fleet.common.error.BadRequestException;
 import com.renault.fleet.common.error.ConflictException;
 import com.renault.fleet.common.error.NotFoundException;
@@ -59,6 +68,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class DealerPortalService {
 
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
+    public static final String STOCK_RESERVED = "STOCK_RESERVED";
 
     private final DealerOrderRepository orders;
     private final FleetRequestRepository requests;
@@ -69,6 +79,10 @@ public class DealerPortalService {
     private final PaymentProofRepository proofs;
     private final FleetRequestService fleetRequests;
     private final VehicleColourRepository colours;
+    private final PlantRepository plants;
+    private final InventoryStockRepository stockRepository;
+    private final StockAllocationService stockAllocations;
+    private final WorkflowHistoryService history;
     private final WorkflowService workflow;
     private final DealerPortalMapper mapper;
     private final AuditService audit;
@@ -78,6 +92,7 @@ public class DealerPortalService {
     public DealerPortalService(DealerOrderRepository orders, FleetRequestRepository requests, DealerRepository dealers,
             UserRepository users, QuotationRepository quotations, PaymentReceiptRepository receipts,
             PaymentProofRepository proofs, FleetRequestService fleetRequests, VehicleColourRepository colours,
+            PlantRepository plants, InventoryStockRepository stockRepository, StockAllocationService stockAllocations, WorkflowHistoryService history,
             WorkflowService workflow,
             DealerPortalMapper mapper, AuditService audit, JsonMapper jsonMapper, Clock clock) {
         this.orders = orders;
@@ -89,6 +104,10 @@ public class DealerPortalService {
         this.proofs = proofs;
         this.fleetRequests = fleetRequests;
         this.colours = colours;
+        this.plants = plants;
+        this.stockRepository = stockRepository;
+        this.stockAllocations = stockAllocations;
+        this.history = history;
         this.workflow = workflow;
         this.mapper = mapper;
         this.audit = audit;
@@ -117,14 +136,34 @@ public class DealerPortalService {
             }
         }
         String notes = body.notes() == null || body.notes().isBlank() ? null : body.notes().strip();
+        List<VehicleVariant> variants = new ArrayList<>();
+        List<VehicleColour> colourChoices = new ArrayList<>();
+        for (CreateDealerOrderRequest.Line line : body.lines()) {
+            if (line.expectedFromStock() != null && line.expectedFromStock() > line.quantity()) {
+                throw new BadRequestException("expectedFromStock can't exceed the line quantity.");
+            }
+            VehicleVariant variant = fleetRequests.activeVariant(line.variantId());
+            variants.add(variant);
+            colourChoices.add(colourFor(variant, line.colourId()));
+        }
+        Plant plant = body.plantId() == null ? null : activePlant(body.plantId());
+        List<List<InventoryStock>> stockRows = plant == null ? null : lockAndCheck(plant, body.lines(), colourChoices);
+
         DealerOrder order = orders.saveAndFlush(new DealerOrder(nextOrderNumber(), dealer,
                 users.getReferenceById(actor.id()), body.requestedDeliveryDate(), notes));
         List<FleetRequest> lines = new ArrayList<>();
         for (int i = 0; i < body.lines().size(); i++) {
             CreateDealerOrderRequest.Line line = body.lines().get(i);
-            VehicleVariant variant = fleetRequests.activeVariant(line.variantId());
-            lines.add(fleetRequests.createForDealerOrder(order, i + 1, variant, colourFor(variant, line.colourId()),
-                    line.quantity(), actor));
+            FleetRequest request = fleetRequests.createForDealerOrder(order, i + 1, variants.get(i), colourChoices.get(i),
+                    line.quantity(), actor);
+            if (plant != null) {
+                request.setPlant(plant);
+                int reserved = stockAllocations.reserveFrom(request, stockRows.get(i), actor);
+                history.record(request, request.getStatus(), request.getStatus(), STOCK_RESERVED, actor, null,
+                        jsonMapper.writeValueAsString(Map.of("plant", plant.getCode(), "reservedUnits", reserved,
+                                "productionRequired", request.getProductionRequired())));
+            }
+            lines.add(request);
         }
         DealerPortalDtos.OrderDetail dto = mapper.toDetail(order, lines);
         audit.record(AuditEvent.of("CREATE", "DEALER_ORDER", String.valueOf(order.getId()))
@@ -198,6 +237,26 @@ public class DealerPortalService {
         return getRequest(id, actor);
     }
 
+    /** Plants dealers can order from (active ones), by name. */
+    @Transactional(readOnly = true)
+    public List<DealerPortalDtos.Plant> plants(AuthenticatedUser actor) {
+        dealerId(actor);
+        return plants.findAll(Sort.by("name")).stream().filter(Plant::isActive)
+                .map(p -> new DealerPortalDtos.Plant(p.getId(), p.getCode(), p.getName(), p.getCity(), p.getState()))
+                .toList();
+    }
+
+    /** Free units per variant and colour at a plant. Display only: the order re-checks under row locks. */
+    @Transactional(readOnly = true)
+    public DealerPortalDtos.PlantAvailability availability(Long plantId, AuthenticatedUser actor) {
+        dealerId(actor);
+        Plant plant = activePlant(plantId);
+        return new DealerPortalDtos.PlantAvailability(plant.getId(), clock.instant(),
+                stockRepository.availabilityAtPlant(plant.getId()).stream()
+                        .map(a -> new DealerPortalDtos.Availability(a.getVariantId(), a.getColourId(), a.getAvailable()))
+                        .toList());
+    }
+
     /** The caller's own request, or 404. */
     @Transactional(readOnly = true)
     public FleetRequest ownRequest(Long id, AuthenticatedUser actor) {
@@ -205,7 +264,57 @@ public class DealerPortalService {
                 .orElseThrow(() -> new NotFoundException("Request " + id + " not found."));
     }
 
-    private String colourFor(VehicleVariant variant, Long colourId) {
+    /**
+     * Locks the plant's stock rows for every line (one ascending-id pass) and refuses the order with 409 if any line
+     * expected more units from stock than are free now. The 409 lists each short line with its current count.
+     */
+    private List<List<InventoryStock>> lockAndCheck(Plant plant, List<CreateDealerOrderRequest.Line> lines,
+            List<VehicleColour> colourChoices) {
+        List<StockAllocationService.StockKey> keys = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            VehicleColour colour = colourChoices.get(i);
+            keys.add(new StockAllocationService.StockKey(lines.get(i).variantId(), colour == null ? null : colour.getId()));
+        }
+        Map<StockAllocationService.StockKey, List<InventoryStock>> locked = stockAllocations.lockPlantStock(plant.getId(), keys);
+        List<Map<String, Object>> shortLines = new ArrayList<>();
+        List<List<InventoryStock>> rows = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            CreateDealerOrderRequest.Line line = lines.get(i);
+            List<InventoryStock> lineRows = locked.get(keys.get(i));
+            rows.add(lineRows);
+            int available = StockAllocationService.available(lineRows);
+            if (line.expectedFromStock() != null && available < line.expectedFromStock()) {
+                Map<String, Object> shortLine = new LinkedHashMap<>();
+                shortLine.put("lineNo", i + 1);
+                shortLine.put("variantId", line.variantId());
+                shortLine.put("colourId", keys.get(i).colourId());
+                shortLine.put("quantity", line.quantity());
+                shortLine.put("expectedFromStock", line.expectedFromStock());
+                shortLine.put("available", available);
+                shortLines.add(shortLine);
+            }
+        }
+        if (!shortLines.isEmpty()) {
+            Map<String, Object> first = shortLines.getFirst();
+            throw new ApiException(HttpStatus.CONFLICT, "Stock Changed",
+                    "Only " + first.get("available") + " available at " + plant.getName() + " for line " + first.get("lineNo")
+                            + " (you expected " + first.get("expectedFromStock") + "). Order what is available from stock "
+                            + "and have the rest produced, or change the quantity.")
+                    .with("plantId", plant.getId())
+                    .with("lines", shortLines);
+        }
+        return rows;
+    }
+
+    private Plant activePlant(Long plantId) {
+        Plant plant = plants.findById(plantId).orElseThrow(() -> new NotFoundException("Plant " + plantId + " not found."));
+        if (!plant.isActive()) {
+            throw new ConflictException("Plant " + plant.getName() + " is not taking orders.");
+        }
+        return plant;
+    }
+
+    private VehicleColour colourFor(VehicleVariant variant, Long colourId) {
         if (colourId == null) {
             return null;
         }
@@ -216,7 +325,7 @@ public class DealerPortalService {
         if (!colour.isActive()) {
             throw new ConflictException("Colour " + colour.getName() + " is no longer available.");
         }
-        return colour.getName();
+        return colour;
     }
 
     private Map<Long, List<FleetRequest>> linesOf(List<Long> orderIds) {

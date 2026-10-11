@@ -13,11 +13,14 @@ import com.renault.fleet.fleetrequest.mapper.FleetRequestAuditMapper;
 import com.renault.fleet.fleetrequest.repository.FleetRequestRepository;
 import com.renault.fleet.fleetrequest.service.FleetRequestDetailAssembler;
 import com.renault.fleet.inventory.dto.MapStockRequest;
+import com.renault.fleet.inventory.dto.MoveReservationRequest;
 import com.renault.fleet.inventory.entity.AllocationStatus;
 import com.renault.fleet.inventory.entity.InventoryStock;
 import com.renault.fleet.inventory.entity.StockAllocation;
 import com.renault.fleet.inventory.repository.InventoryStockRepository;
 import com.renault.fleet.inventory.repository.StockAllocationRepository;
+import com.renault.fleet.production.entity.Plant;
+import com.renault.fleet.production.repository.PlantRepository;
 import com.renault.fleet.security.AuthenticatedUser;
 import com.renault.fleet.user.entity.User;
 import com.renault.fleet.user.repository.UserRepository;
@@ -29,6 +32,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import org.springframework.stereotype.Service;
@@ -38,17 +42,19 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Maps inventory stock to fleet requests. Every stock change happens inside one transaction that holds
  * {@code SELECT ... FOR UPDATE} locks on the request row and on each touched stock row (taken in ascending id
- * order, so two mappings can never deadlock). {@code CHECK (quantity_available >= 0)} is the last line of defence.
+ * order, so two mappings can never deadlock). {@code CHECK (reserved >= 0 AND reserved <= on_hand)} is the last line of defence.
  */
 @Service
 public class StockAllocationService {
 
     public static final String STOCK_MAPPED = "STOCK_MAPPED";
+    public static final String RESERVATION_MOVED = "RESERVATION_MOVED";
 
     private final FleetRequestRepository requests;
     private final InventoryStockRepository stock;
     private final StockAllocationRepository allocations;
     private final UserRepository users;
+    private final PlantRepository plants;
     private final WorkflowHistoryService history;
     private final AuditService audit;
     private final FleetRequestAuditMapper auditMapper;
@@ -56,12 +62,14 @@ public class StockAllocationService {
     private final Clock clock;
 
     public StockAllocationService(FleetRequestRepository requests, InventoryStockRepository stock,
-            StockAllocationRepository allocations, UserRepository users, WorkflowHistoryService history,
+            StockAllocationRepository allocations, UserRepository users, PlantRepository plants,
+            WorkflowHistoryService history,
             AuditService audit, FleetRequestAuditMapper auditMapper, FleetRequestDetailAssembler assembler, Clock clock) {
         this.requests = requests;
         this.stock = stock;
         this.allocations = allocations;
         this.users = users;
+        this.plants = plants;
         this.history = history;
         this.audit = audit;
         this.auditMapper = auditMapper;
@@ -96,6 +104,9 @@ public class StockAllocationService {
             if (!row.getVariant().getId().equals(request.getVariant().getId())) {
                 throw new ConflictException("Stock " + row.getId() + " holds a different variant than the request.");
             }
+            if (!sameColour(row, request)) {
+                throw new ConflictException("Stock " + row.getId() + " is a different colour than the request.");
+            }
             if (!row.getLocation().isActive()) {
                 throw new ConflictException("Stock " + row.getId() + " is at an inactive location.");
             }
@@ -103,8 +114,7 @@ public class StockAllocationService {
                 throw new ConflictException("Insufficient stock at " + row.getLocation().getName() + ": requested " + qty
                         + ", available " + row.getQuantityAvailable() + ".");
             }
-            row.setQuantityAvailable(row.getQuantityAvailable() - qty);
-            row.setQuantityAllocated(row.getQuantityAllocated() + qty);
+            row.reserve(qty);
             allocations.save(new StockAllocation(request, row, qty, actorRef));
             total += qty;
         }
@@ -144,7 +154,7 @@ public class StockAllocationService {
         for (StockAllocation allocation : allocations.findByFleetRequestIdAndStatusOrderById(request.getId(),
                 AllocationStatus.ACTIVE)) {
             InventoryStock row = locked.get(allocation.getStock().getId());
-            row.setQuantityAllocated(row.getQuantityAllocated() - allocation.getQuantity());
+            row.consume(allocation.getQuantity());
             allocation.setStatus(AllocationStatus.CONSUMED);
             consumed += allocation.getQuantity();
         }
@@ -157,8 +167,7 @@ public class StockAllocationService {
         int released = 0;
         for (StockAllocation allocation : active) {
             InventoryStock row = locked.get(allocation.getStock().getId());
-            row.setQuantityAvailable(row.getQuantityAvailable() + allocation.getQuantity());
-            row.setQuantityAllocated(row.getQuantityAllocated() - allocation.getQuantity());
+            row.release(allocation.getQuantity());
             allocation.setStatus(AllocationStatus.RELEASED);
             allocation.setReleasedAt(now);
             released += allocation.getQuantity();
@@ -167,6 +176,108 @@ public class StockAllocationService {
         // with the still-ACTIVE row in ux_stock_allocations_active.
         allocations.flush();
         return released;
+    }
+
+    /** A variant in one colour (null = uncoloured stock). */
+    public record StockKey(Long variantId, Long colourId) {
+    }
+
+    /**
+     * Locks every active stock row at the plant for each key, all in one ascending-id pass (so concurrent orders and
+     * moves can't deadlock). The locks are held until the caller's transaction ends.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Map<StockKey, List<InventoryStock>> lockPlantStock(Long plantId, Collection<StockKey> keys) {
+        Map<StockKey, List<Long>> idsByKey = new LinkedHashMap<>();
+        TreeSet<Long> all = new TreeSet<>();
+        for (StockKey key : keys) {
+            List<Long> ids = stock.findPlantStockIds(plantId, key.variantId(), key.colourId());
+            idsByKey.put(key, ids);
+            all.addAll(ids);
+        }
+        Map<Long, InventoryStock> locked = lockInOrder(all);
+        Map<StockKey, List<InventoryStock>> result = new LinkedHashMap<>();
+        idsByKey.forEach((key, ids) -> result.put(key, ids.stream().map(locked::get).toList()));
+        return result;
+    }
+
+    public static int available(List<InventoryStock> rows) {
+        return rows.stream().mapToInt(InventoryStock::getQuantityAvailable).sum();
+    }
+
+    /**
+     * Reserves min(request quantity, available) from already-locked {@code rows}, records the allocations, and
+     * recomputes {@code productionRequired}. The reservation counts as the request's stock mapping; Marketing can
+     * re-map or move it. Returns the units reserved.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public int reserveFrom(FleetRequest request, List<InventoryStock> rows, AuthenticatedUser actor) {
+        User actorRef = users.getReferenceById(actor.id());
+        int remaining = request.getQuantity();
+        int total = 0;
+        for (InventoryStock row : rows) {
+            int take = Math.min(remaining, row.getQuantityAvailable());
+            if (take <= 0) {
+                continue;
+            }
+            row.reserve(take);
+            allocations.save(new StockAllocation(request, row, take, actorRef));
+            remaining -= take;
+            total += take;
+        }
+        request.applyAllocation(total);
+        request.markStockMapped(actorRef, Instant.now(clock));
+        allocations.flush();
+        return total;
+    }
+
+    /**
+     * Marketing moves a request's reservation to another plant: everything held is released and min(quantity,
+     * available) is reserved at the new plant, in one transaction with all affected rows locked. Audited.
+     */
+    @Transactional
+    public FleetRequestDetailDto moveReservation(Long requestId, MoveReservationRequest body, AuthenticatedUser actor) {
+        FleetRequest request = requests.findByIdForUpdate(requestId)
+                .orElseThrow(() -> new NotFoundException("Fleet request " + requestId + " not found."));
+        Versions.check(request, body.version());
+        if (request.getStatus() != FleetRequestStatus.PENDING_MARKETING_REVIEW) {
+            throw new ConflictException("A reservation can only be moved while the request is PENDING_MARKETING_REVIEW (it is "
+                    + request.getStatus() + ").");
+        }
+        Plant target = plants.findById(body.plantId())
+                .orElseThrow(() -> new NotFoundException("Plant " + body.plantId() + " not found."));
+        if (!target.isActive()) {
+            throw new ConflictException("Plant " + target.getCode() + " is not active.");
+        }
+        Plant from = request.getPlant();
+        String before = auditMapper.json(request);
+        Long colourId = request.getColourOption() == null ? null : request.getColourOption().getId();
+        List<Long> targetIds = stock.findPlantStockIds(target.getId(), request.getVariant().getId(), colourId);
+        Set<Long> touched = new TreeSet<>(allocations.findActiveStockIds(requestId));
+        touched.addAll(targetIds);
+        Map<Long, InventoryStock> locked = lockInOrder(touched);
+        int released = release(requestId, locked, Instant.now(clock));
+        int reserved = reserveFrom(request, targetIds.stream().map(locked::get).toList(), actor);
+        request.setPlant(target);
+
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("fromPlant", from == null ? null : from.getCode());
+        meta.put("toPlant", target.getCode());
+        meta.put("releasedUnits", released);
+        meta.put("reservedUnits", reserved);
+        meta.put("productionRequired", request.getProductionRequired());
+        String reason = body.reason() == null || body.reason().isBlank() ? null : body.reason().strip();
+        history.record(request, request.getStatus(), request.getStatus(), RESERVATION_MOVED, actor, reason, auditMapper.toJson(meta));
+        requests.flush();
+        audit.record(AuditEvent.of(RESERVATION_MOVED, "FLEET_REQUEST", String.valueOf(requestId))
+                .withActor(actor).withChange(before, auditMapper.json(request)).withReason(reason));
+        return assembler.toDetail(request, actor.role());
+    }
+
+    static boolean sameColour(InventoryStock row, FleetRequest request) {
+        Long rowColour = row.getColour() == null ? null : row.getColour().getId();
+        Long requestColour = request.getColourOption() == null ? null : request.getColourOption().getId();
+        return Objects.equals(rowColour, requestColour);
     }
 
     /** Locks stock rows in ascending id order (the caller passes a sorted set) before they are read anywhere else. */

@@ -13,5 +13,8 @@ public record InventoryStockDto(
         String variantName,
         int quantityAvailable,
         int quantityAllocated,
-        Long version) {
+        Long version,
+        int onHand,
+        Long colourId,
+        String colourName) {
 }

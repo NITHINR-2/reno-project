@@ -545,3 +545,22 @@ Backend unchanged, not re-run (last: 1361 tests, 0 failures).
 **Open:** not run live (V13–V14 apply on your next backend start; set `DEV_DEALER_PASSWORD` for `dealer.<code>` logins). No visual check at 360–1440 px this phase. No email delivery. Main bundle still > 500 kB.
 
 **Next:** waiting for the next phase prompt.
+
+---
+
+## Phase D3 — Plants and live stock (2026-10-11) ✅
+
+**No new dependencies.** CLAUDE.md has no D3 section; built from the prompt (choices in DECISIONS.md). **Backend (V15):** `inventory_stock.on_hand/reserved` + CHECK (reserved ≤ on_hand), generated `available`, per-colour stock, `fleet_requests.colour_id`; dealer plants + availability endpoints; dealer order locks plant stock rows, reserves min(qty, free), sets plant/productionRequired, 409 "Stock Changed" with current counts when `expectedFromStock` is stale; release on dealer cancel, MH reject, Supervisor cancel; consume on dispatch (COMPLETE); Marketing move-reservation (audited); dev seed: Bangalore plant + plant stores with coloured stock. **Frontend:** plant picker, per-card "N available at <plant>" that drops as the cart fills (no API call), 15 s + focus refetch, per-line stock/production split, "Only N available" dialog (accept N from stock or edit).
+
+| Command | Result |
+|---|---|
+| Inventory/workflow suites after the on_hand/reserved refactor | 2 test-side fixes (schema test: one violation per transaction; seed SQL arg count) → all passed |
+| `./mvnw -q -o test -Dtest=PlantStockApiTest` | **6 passed** first run (concurrent last-units race: exactly one 201 + one 409; reserved ≤ on_hand and = active allocations; release on cancel/reject/supervisor cancel; move) |
+| `npx vitest --run src/features/dealer` | 3 D2 tests needed the new fields/handlers → **24 passed** (availability drop without API call, 15 s + focus refetch, 409 accept and edit flows) |
+| `./mvnw -q -o verify` (1st) | 3 failures: reject now releases stock (old expectation kept the mapping) and bumped the version twice → release before touching the request; loop test re-maps stock |
+| `./mvnw -q -o verify` (final) | **exit 0 — 1594 tests, 0 failures, 0 errors** |
+| `npm test -- --run --reporter=dot` / `npm run lint` / `npm run build` | **19 files, 175 tests passed** / 0 findings / OK |
+
+**Open:** not run live (V13–V15 apply on next backend start). No HQ UI for moving a reservation. Stock is consumed at COMPLETE (the workflow's dispatch event), not at DISPATCH_SCHEDULED. Main bundle still > 500 kB.
+
+**Next:** waiting for the next phase prompt.

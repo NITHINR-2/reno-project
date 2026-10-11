@@ -2,6 +2,7 @@ package com.renault.fleet.inventory.service;
 
 import com.renault.fleet.common.api.PageResponse;
 import com.renault.fleet.common.error.NotFoundException;
+import com.renault.fleet.fleetrequest.entity.FleetRequest;
 import com.renault.fleet.fleetrequest.repository.FleetRequestRepository;
 import com.renault.fleet.inventory.dto.InventoryLocationDto;
 import com.renault.fleet.inventory.dto.InventoryLocationFilter;
@@ -55,7 +56,15 @@ public class InventoryService {
     }
 
     public PageResponse<InventoryStockDto> stock(InventoryStockFilter f, Pageable pageable) {
+        return stock(f, null, pageable);
+    }
+
+    private PageResponse<InventoryStockDto> stock(InventoryStockFilter f, Specification<InventoryStock> extra,
+            Pageable pageable) {
         List<Specification<InventoryStock>> specs = new ArrayList<>();
+        if (extra != null) {
+            specs.add(extra);
+        }
         if (f.variantId() != null) {
             specs.add((root, q, cb) -> cb.equal(root.get("variant").get("id"), f.variantId()));
         }
@@ -79,9 +88,12 @@ public class InventoryService {
 
     /** Stock that may be mapped to the request: same variant, active location, units available. */
     public PageResponse<InventoryStockDto> stockOptions(Long requestId, Pageable pageable) {
-        Long variantId = requests.findById(requestId)
-                .orElseThrow(() -> new NotFoundException("Fleet request " + requestId + " not found."))
-                .getVariant().getId();
-        return stock(new InventoryStockFilter(variantId, null, null, null, true, true), pageable);
+        FleetRequest request = requests.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Fleet request " + requestId + " not found."));
+        Long colourId = request.getColourOption() == null ? null : request.getColourOption().getId();
+        Specification<InventoryStock> sameColour = colourId == null
+                ? (root, q, cb) -> cb.isNull(root.get("colour"))
+                : (root, q, cb) -> cb.equal(root.get("colour").get("id"), colourId);
+        return stock(new InventoryStockFilter(request.getVariant().getId(), null, null, null, true, true), sameColour, pageable);
     }
 }

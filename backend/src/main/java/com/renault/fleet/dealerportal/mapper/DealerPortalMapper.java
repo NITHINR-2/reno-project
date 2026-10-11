@@ -25,7 +25,8 @@ public class DealerPortalMapper {
         return new DealerPortalDtos.Request(r.getId(), r.getRequestNumber(),
                 order == null ? null : order.getId(), order == null ? null : order.getOrderNumber(),
                 r.getDealerOrderLineNo(), r.getVariant().getModel().getName(), r.getVariant().getCode(),
-                r.getVariant().getName(), r.getColour(), r.getQuantity(), DealerRequestStatus.of(r.getStatus()),
+                r.getVariant().getName(), r.getColour(), r.getQuantity(), r.getPlant() == null ? null : r.getPlant().getName(),
+                r.getAllocatedQty(), r.getProductionRequired(), DealerRequestStatus.of(r.getStatus()),
                 r.getRequestedDeliveryDate(), r.getCreatedAt(),
                 r.getStatus() == FleetRequestStatus.PENDING_MARKETING_REVIEW,
                 PAYMENT_PROOF_STATES.contains(r.getStatus()), r.getVersion());

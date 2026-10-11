@@ -33,11 +33,11 @@ public interface FleetRequestRepository extends JpaRepository<FleetRequest, Long
     Optional<FleetRequest> findByRequestNumber(String requestNumber);
 
     /** Dealer Portal lookup: another dealer's request is indistinguishable from a missing one. */
-    @EntityGraph(attributePaths = {"variant", "variant.model", "dealerOrder"})
+    @EntityGraph(attributePaths = {"variant", "variant.model", "dealerOrder", "plant"})
     Optional<FleetRequest> findByIdAndDealerId(Long id, Long dealerId);
 
     /** The lines of the given dealer orders, in line order. */
-    @EntityGraph(attributePaths = {"variant", "variant.model"})
+    @EntityGraph(attributePaths = {"variant", "variant.model", "plant"})
     List<FleetRequest> findByDealerOrderIdInOrderByDealerOrderLineNo(Collection<Long> dealerOrderIds);
 
     @Query("select r.status as status, count(r) as requests, coalesce(sum(r.productionRequired), 0) as productionUnits"

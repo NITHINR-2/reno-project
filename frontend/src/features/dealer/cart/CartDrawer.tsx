@@ -11,9 +11,12 @@ import { useToast } from '@/components/ui/useToast'
 import { formatCount, formatDate, formatINR, todayIST } from '@/lib/format'
 import { listItem } from '@/lib/motion'
 import { reportError } from '@/lib/reportError'
-import { useCreateOrder } from '../queries'
+import { isAxiosError } from 'axios'
+import { availableFor, stockConflictSchema } from '../api'
+import { useCreateOrder, usePlantAvailability, usePlants } from '../queries'
 import { useCart, type CartLine } from './cartContext'
 import { MAX_QUANTITY, toOrderBody, validateCart } from './cartRules'
+import { StockChangedDialog, type ShortLine } from './StockChangedDialog'
 
 /** The dealer's cart: edit quantities, the requested delivery date and notes, then place one order. */
 export function CartDrawer() {
@@ -23,6 +26,10 @@ export function CartDrawer() {
   const create = useCreateOrder()
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [confirming, setConfirming] = useState(false)
+  const [shortLines, setShortLines] = useState<ShortLine[] | null>(null)
+  const plants = usePlants()
+  const plantName = plants.data?.find((p) => p.id === cart.plantId)?.name ?? 'the plant'
+  const availability = usePlantAvailability(cart.plantId)
   const dateId = useId()
   const notesId = useId()
   // List-price estimate for orientation only; the HQ quotation is the price.
@@ -34,16 +41,27 @@ export function CartDrawer() {
     if (Object.keys(found).length === 0) setConfirming(true)
   }
 
-  function submit() {
-    create.mutate(toOrderBody(cart), {
+  /** {@code accepted} overrides the expected stock per line after the dealer accepts the 409's current counts. */
+  function submit(accepted: Map<string, number> = new Map()) {
+    const body = toOrderBody(cart, (line) => accepted.get(line.key) ?? availableFor(availability.data, line.variantId, line.colourId))
+    create.mutate(body, {
       onSuccess: (order) => {
         cart.clear()
         cart.close()
         setErrors({})
+        setShortLines(null)
         toast.success('Order placed', `${order.orderNumber} is with HQ for review.`)
         navigate(`/dealer/orders/${order.id}`)
       },
-      onError: (error) => reportError(toast, error),
+      onError: (error) => {
+        const conflict = isAxiosError(error) && error.response?.status === 409 ? stockConflictSchema.safeParse(error.response.data) : null
+        if (conflict?.success) {
+          setShortLines(conflict.data.lines.map((s) => ({ line: cart.lines[s.lineNo - 1], available: s.available })).filter((s) => s.line))
+        } else {
+          setShortLines(null)
+          reportError(toast, error)
+        }
+      },
       onSettled: () => setConfirming(false),
     })
   }
@@ -77,7 +95,7 @@ export function CartDrawer() {
               <AnimatePresence initial={false}>
                 {cart.lines.map((line, index) => (
                   <motion.li key={line.key} layout custom={index} variants={listItem} initial="initial" animate="animate" exit="exit" className="p-3">
-                    <CartLineRow line={line} error={errors[`lines.${line.key}`]} />
+                    <CartLineRow line={line} error={errors[`lines.${line.key}`]} available={availableFor(availability.data, line.variantId, line.colourId)} plantName={plantName} />
                   </motion.li>
                 ))}
               </AnimatePresence>
@@ -115,13 +133,20 @@ export function CartDrawer() {
         confirmLabel="Place order"
         loading={create.isPending}
         onCancel={() => setConfirming(false)}
-        onConfirm={submit}
+        onConfirm={() => submit()}
+      />
+      <StockChangedDialog
+        shortLines={shortLines}
+        plantName={plantName}
+        loading={create.isPending}
+        onEdit={() => setShortLines(null)}
+        onAccept={() => submit(new Map((shortLines ?? []).map((s) => [s.line.key, s.available])))}
       />
     </>
   )
 }
 
-function CartLineRow({ line, error }: { line: CartLine; error?: string }) {
+function CartLineRow({ line, error, available, plantName }: { line: CartLine; error?: string; available?: number; plantName: string }) {
   const cart = useCart()
   const qtyId = useId()
   return (
@@ -136,6 +161,12 @@ function CartLineRow({ line, error }: { line: CartLine; error?: string }) {
           </p>
         )}
         <p className="mt-1 text-xs text-fg-muted">{formatINR(line.unitPrice)} each (list, ex-GST)</p>
+        {available !== undefined && Number.isFinite(line.quantity) && line.quantity > 0 && (
+          <p className="mt-1 text-xs text-fg-muted">
+            {formatCount(Math.min(available, line.quantity))} from stock at {plantName}
+            {line.quantity > available ? ` · ${formatCount(line.quantity - available)} to be produced` : ''}
+          </p>
+        )}
       </div>
       <div className="w-28">
         <label htmlFor={qtyId} className="sr-only">Quantity for {line.variantName}{line.colourName ? ` in ${line.colourName}` : ''}</label>

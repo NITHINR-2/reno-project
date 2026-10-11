@@ -1,5 +1,6 @@
 import { CarFront, ShoppingCart } from 'lucide-react'
 import { motion } from 'motion/react'
+import { useEffect } from 'react'
 import { useSearchParams } from 'react-router'
 import { inputClass } from '@/components/forms/Field'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -14,7 +15,7 @@ import { statusLabel } from '@/lib/format'
 import { listItem } from '@/lib/motion'
 import { BODY_TYPES, FUEL_TYPES, TRANSMISSIONS, type CatalogueQuery } from '../api'
 import { useCart } from '../cart/cartContext'
-import { useCatalogue } from '../queries'
+import { useCatalogue, usePlantAvailability, usePlants } from '../queries'
 import { ModelCard } from './ModelCard'
 
 const FILTER_KEYS = ['q', 'bodyType', 'fuelType', 'transmission', 'minPrice', 'maxPrice'] as const
@@ -31,6 +32,15 @@ export function CataloguePage() {
   const priceError = query.minPrice && query.maxPrice && Number(query.minPrice) > Number(query.maxPrice)
   // An inverted range is shown as a field error and left out of the request instead of producing a 400.
   const catalogue = useCatalogue(priceError ? { ...query, minPrice: undefined, maxPrice: undefined } : query)
+  const plants = usePlants()
+  const plantId = cart.plantId ?? plants.data?.[0]?.id
+  const plant = plants.data?.find((p) => p.id === plantId)
+  const availability = usePlantAvailability(plant?.id)
+  const { setPlant } = cart
+  useEffect(() => {
+    // Default to the first plant (or replace one that is no longer offered).
+    if (plants.data?.length && !plants.data.some((p) => p.id === cart.plantId)) setPlant(plants.data[0].id)
+  }, [plants.data, cart.plantId, setPlant])
 
   function set(key: (typeof FILTER_KEYS)[number] | 'page', value: string) {
     setParams(
@@ -71,6 +81,25 @@ export function CataloguePage() {
           </Button>
         }
       />
+      <Card className="mb-4">
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
+          <Labeled label="Order from plant">
+            {(id) => (
+              <select id={id} value={plantId ?? ''} disabled={!plants.data} onChange={(e) => setPlant(Number(e.target.value))} className={`${inputClass} sm:w-72`}>
+                {!plants.data && <option value="">Loading plants…</option>}
+                {plants.data?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.city})
+                  </option>
+                ))}
+              </select>
+            )}
+          </Labeled>
+          <p className="text-xs text-fg-muted sm:pb-3">
+            {availability.error ? 'Live stock is unavailable right now; your order is still checked.' : 'Stock refreshes every 15 s. Anything not in stock is produced.'}
+          </p>
+        </div>
+      </Card>
       <Card className="mb-6">
         <FilterBar>
           <Labeled label="Search models">
@@ -116,7 +145,7 @@ export function CataloguePage() {
           <ul aria-label="Models" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {catalogue.data.content.map((model, index) => (
               <motion.li key={model.id} custom={index} variants={listItem} initial="initial" animate="animate">
-                <ModelCard model={model} />
+                <ModelCard model={model} availability={availability.data} plantName={plant?.name} />
               </motion.li>
             ))}
           </ul>

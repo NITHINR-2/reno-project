@@ -120,7 +120,7 @@ class AnalyticsDemoSeedTest {
                     where a.fleet_request_id = r.id and a.status = 'ACTIVE'), 0)
                 """.formatted(in), Integer.class)).isZero();
         for (InventoryStock s : List.of(s1, s2, s3)) {
-            Map<String, Object> row = jdbc.queryForMap("select quantity_allocated, quantity_available from inventory_stock where id = ?", s.getId());
+            Map<String, Object> row = jdbc.queryForMap("select reserved as quantity_allocated, available as quantity_available from inventory_stock where id = ?", s.getId());
             Integer active = jdbc.queryForObject("select coalesce(sum(quantity), 0) from stock_allocations where stock_id = ? "
                     + "and status = 'ACTIVE'", Integer.class, s.getId());
             Integer used = jdbc.queryForObject("select coalesce(sum(quantity), 0) from stock_allocations where stock_id = ? "

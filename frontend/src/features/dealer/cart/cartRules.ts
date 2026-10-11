@@ -41,10 +41,23 @@ export function validateCart(cart: CartState): Record<string, string> {
   return errors
 }
 
-export function toOrderBody(cart: CartState): CreateOrderBody {
+/**
+ * {@code expectedFromStock(line)} is what the dealer was shown as coming from stock (min of quantity and the plant's
+ * free units). The server refuses with 409 if fewer are free when it locks the rows.
+ */
+export function toOrderBody(cart: CartState, expectedFromStock: (line: CartState['lines'][number]) => number | undefined): CreateOrderBody {
   const notes = cart.notes.trim()
   return {
-    lines: cart.lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, ...(l.colourId ? { colourId: l.colourId } : {}) })),
+    ...(cart.plantId ? { plantId: cart.plantId } : {}),
+    lines: cart.lines.map((l) => {
+      const expected = expectedFromStock(l)
+      return {
+        variantId: l.variantId,
+        quantity: l.quantity,
+        ...(l.colourId ? { colourId: l.colourId } : {}),
+        ...(expected !== undefined ? { expectedFromStock: Math.min(expected, l.quantity) } : {}),
+      }
+    }),
     ...(cart.requestedDeliveryDate ? { requestedDeliveryDate: cart.requestedDeliveryDate } : {}),
     ...(notes ? { notes } : {}),
   }

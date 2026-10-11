@@ -2,6 +2,7 @@ package com.renault.fleet.fleetrequest.service;
 
 import com.renault.fleet.audit.service.AuditEvent;
 import com.renault.fleet.audit.service.AuditService;
+import com.renault.fleet.catalog.entity.VehicleColour;
 import com.renault.fleet.catalog.entity.VehicleVariant;
 import com.renault.fleet.catalog.repository.VehicleVariantRepository;
 import com.renault.fleet.common.api.PageResponse;
@@ -122,7 +123,7 @@ public class FleetRequestService {
      * Marketing sets both during review. The caller has checked that the dealer is ACTIVE and owns the order.
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    public FleetRequest createForDealerOrder(DealerOrder order, int lineNo, VehicleVariant variant, String colour,
+    public FleetRequest createForDealerOrder(DealerOrder order, int lineNo, VehicleVariant variant, VehicleColour colour,
             int quantity, AuthenticatedUser actor) {
         FleetRequest request = new FleetRequest(nextRequestNumber(), order.getDealer(), variant, quantity,
                 users.getReferenceById(actor.id()));

@@ -56,7 +56,8 @@ public class FleetRequestDetailAssembler {
         requests.flush();
         var active = allocations.findByFleetRequestIdAndStatusOrderById(request.getId(), AllocationStatus.ACTIVE)
                 .stream().map(inventoryMapper::toAllocation).toList();
-        long eligible = stock.sumEligibleAvailable(request.getVariant().getId());
+        long eligible = stock.sumEligibleAvailable(request.getVariant().getId(),
+                request.getColourOption() == null ? null : request.getColourOption().getId());
         var depositReceived = receipts.sumAmount(request.getId(), ReceiptType.DEPOSIT, ReceiptStatus.APPROVED);
         return mapper.toDetail(request, active, eligible, depositReceived,
                 WorkflowTransitions.available(request, viewerRole, facts));

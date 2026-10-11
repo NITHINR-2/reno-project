@@ -24,7 +24,9 @@ export function LineCard({ line }: { line: DealerRequest }) {
     <Card>
       <CardHeader
         title={title}
-        description={`${current.requestNumber} · ${formatCount(current.quantity)} units${current.colour ? ` · ${current.colour}` : ''}`}
+        description={`${current.requestNumber} · ${formatCount(current.quantity)} units${current.colour ? ` · ${current.colour}` : ''}${
+          current.plantName ? ` · ${formatCount(current.fromStock)} from stock at ${current.plantName}, ${formatCount(current.toProduce)} to be produced` : ''
+        }`}
         actions={<DealerStatusBadge status={current.status} />}
       />
       <CardBody className="space-y-6">
