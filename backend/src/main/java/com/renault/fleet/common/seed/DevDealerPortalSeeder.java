@@ -118,9 +118,11 @@ public class DevDealerPortalSeeder implements ApplicationRunner {
                 m.setSeatingCapacity(seats);
                 m.setDescription(description);
             }
-            if (m.getImageUrl() == null) {
-                // Served by the frontend from public/cars (Wikimedia Commons photos; see public/cars/CREDITS.md).
-                m.setImageUrl("/cars/" + code.toLowerCase(Locale.ROOT) + ".jpg");
+            // Served by the frontend from public/cars (images supplied by the project owner). Replaces only an empty
+            // image or the earlier seeded .jpg path, never one an admin set.
+            String seeded = "/cars/" + code.toLowerCase(Locale.ROOT);
+            if (m.getImageUrl() == null || m.getImageUrl().equals(seeded + ".jpg")) {
+                m.setImageUrl(seeded + ".png");
             }
         });
     }

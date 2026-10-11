@@ -324,3 +324,4 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 
 - **Photos come from Wikimedia Commons (CC BY / CC BY-SA), not Renault's site** — CLAUDE.md forbids copying Renault's website or assets; Commons images may be reused with attribution. Credits are kept in `frontend/public/cars/CREDITS.md`.
 - **Served from the frontend (`/cars/<model>.jpg`), not hotlinked:** Wikimedia rate-limited direct requests (429) while fetching them. V16 lets `image_url` be an https URL or a site-relative `/path`; the dev seed fills it only when it is empty.
+- **Replaced by owner-supplied images (2026-10-11):** the four catalogue photos are now the PNGs the project owner provided (`frontend/public/cars/<model>.png`); the Commons photos and their credits file were removed. The dev seed moves the earlier `/cars/<model>.jpg` path to `.png` but never overwrites an image an admin set. Usage rights for these images are the owner's responsibility.

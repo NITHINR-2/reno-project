@@ -578,3 +578,5 @@ Duster, Kiger, Triber and Kwid photos (Wikimedia Commons, CC BY/BY-SA, credits i
 | `./mvnw -q -o verify` | **exit 0 — 1594 tests, 0 failures, 0 errors** |
 
 **Open:** the licences ask for attribution; the credits file covers the repo, but a visible credit in the UI would be needed before any public use.
+
+**Update:** photos replaced with the owner's PNGs (`frontend/public/cars/*.png`); seed points to `.png` (also migrates the earlier `.jpg` path). `DevDealerPortalSeederTest` 2 passed, `DealerPortalApiTest` 8 passed, `npm run build` OK.
