@@ -1,5 +1,7 @@
 package com.renault.fleet.user.controller;
 
+import com.renault.fleet.auth.dto.SetPasswordLinkDto;
+import com.renault.fleet.auth.service.SetPasswordService;
 import com.renault.fleet.common.api.PageResponse;
 import com.renault.fleet.security.AuthenticatedUser;
 import com.renault.fleet.user.dto.CreateUserRequest;
@@ -33,9 +35,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminUserController {
 
     private final UserAdminService service;
+    private final SetPasswordService setPasswordService;
 
-    public AdminUserController(UserAdminService service) {
+    public AdminUserController(UserAdminService service, SetPasswordService setPasswordService) {
         this.service = service;
+        this.setPasswordService = setPasswordService;
     }
 
     @GetMapping
@@ -71,6 +75,13 @@ public class AdminUserController {
     public UserDto activate(@PathVariable Long id,
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
         return service.setActive(id, true, principal);
+    }
+
+    @PostMapping("/{id}/set-password-link")
+    @Operation(summary = "Issue a one-time set-password link (shown once; replaces the user's older links)")
+    public SetPasswordLinkDto setPasswordLink(@PathVariable Long id,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
+        return setPasswordService.issue(id, principal);
     }
 
     @PostMapping("/{id}/deactivate")

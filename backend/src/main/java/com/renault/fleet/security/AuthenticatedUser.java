@@ -17,7 +17,13 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
  * {@code ROLE_<role>} plus every permission code of that role.
  */
 public record AuthenticatedUser(Long id, String username, String fullName, String email, RoleCode role,
-        Set<String> permissions) implements AuthenticatedPrincipal {
+        Set<String> permissions, Long dealerId) implements AuthenticatedPrincipal {
+
+    /** An HQ principal (no dealership). */
+    public AuthenticatedUser(Long id, String username, String fullName, String email, RoleCode role,
+            Set<String> permissions) {
+        this(id, username, fullName, email, role, permissions, null);
+    }
 
     /** Requires {@code user.role.permissions} to be initialised. */
     public static AuthenticatedUser from(User user) {
@@ -25,7 +31,8 @@ public record AuthenticatedUser(Long id, String username, String fullName, Strin
                 .map(Permission::getCode)
                 .collect(Collectors.toCollection(TreeSet::new));
         return new AuthenticatedUser(user.getId(), user.getUsername(), user.getFullName(), user.getEmail(),
-                user.getRole().getCode(), Set.copyOf(permissions));
+                user.getRole().getCode(), Set.copyOf(permissions),
+                user.getDealer() == null ? null : user.getDealer().getId());
     }
 
     public List<GrantedAuthority> authorities() {

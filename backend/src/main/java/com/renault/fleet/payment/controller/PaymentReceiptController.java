@@ -3,6 +3,8 @@ package com.renault.fleet.payment.controller;
 import com.renault.fleet.common.api.PageResponse;
 import com.renault.fleet.payment.dto.PaymentReceiptDto;
 import com.renault.fleet.payment.dto.RecordReceiptRequest;
+import com.renault.fleet.payment.entity.PaymentProof;
+import com.renault.fleet.payment.service.PaymentProofService;
 import com.renault.fleet.payment.service.PaymentReceiptService;
 import com.renault.fleet.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,7 +15,12 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,9 +35,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentReceiptController {
 
     private final PaymentReceiptService service;
+    private final PaymentProofService proofs;
 
-    public PaymentReceiptController(PaymentReceiptService service) {
+    public PaymentReceiptController(PaymentReceiptService service, PaymentProofService proofs) {
         this.service = service;
+        this.proofs = proofs;
     }
 
     @PostMapping("/api/fleet-requests/{id}/payment-receipts")
@@ -55,6 +64,20 @@ public class PaymentReceiptController {
     @Operation(summary = "Get one receipt")
     public PaymentReceiptDto get(@PathVariable Long id) {
         return service.get(id);
+    }
+
+    @GetMapping("/api/payment-receipts/{id}/proof")
+    @PreAuthorize("hasAnyAuthority('PAYMENT_RECORD', 'DEPOSIT_REVIEW')")
+    @Operation(summary = "Download the payment proof a dealer uploaded with this receipt (audited)")
+    public ResponseEntity<byte[]> proof(@PathVariable Long id,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser principal) {
+        PaymentProof proof = proofs.forReceipt(id, principal);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(proof.getContentType()))
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(proof.getFileName()).build().toString())
+                .body(proof.getContent());
     }
 
     @PostMapping("/api/payment-receipts/{id}/approve")

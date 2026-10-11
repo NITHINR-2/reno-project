@@ -5,5 +5,6 @@ public enum RevokeReason {
     LOGOUT,
     REUSE_DETECTED,
     ADMIN,
-    USER_DEACTIVATED
+    USER_DEACTIVATED,
+    PASSWORD_CHANGED
 }

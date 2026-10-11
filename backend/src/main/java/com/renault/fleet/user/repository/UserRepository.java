@@ -35,6 +35,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     boolean existsByUsernameIgnoreCase(String username);
 
+    boolean existsByDealerId(Long dealerId);
+
     @Transactional
     @Modifying
     @Query("update User u set u.lastLoginAt = :at where u.id = :id")

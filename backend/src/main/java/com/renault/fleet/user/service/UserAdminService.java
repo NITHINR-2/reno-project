@@ -9,6 +9,8 @@ import com.renault.fleet.common.error.BadRequestException;
 import com.renault.fleet.common.error.ConflictException;
 import com.renault.fleet.common.error.NotFoundException;
 import com.renault.fleet.common.persistence.Versions;
+import com.renault.fleet.dealer.entity.Dealer;
+import com.renault.fleet.dealer.repository.DealerRepository;
 import com.renault.fleet.security.AuthenticatedUser;
 import com.renault.fleet.user.dto.CreateUserRequest;
 import com.renault.fleet.user.dto.UpdateUserRequest;
@@ -19,9 +21,11 @@ import com.renault.fleet.user.entity.RoleCode;
 import com.renault.fleet.user.entity.User;
 import com.renault.fleet.user.repository.RoleRepository;
 import com.renault.fleet.user.repository.UserRepository;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.data.domain.Pageable;
@@ -40,7 +44,10 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class UserAdminService {
 
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private final UserRepository users;
+    private final DealerRepository dealers;
     private final RoleRepository roles;
     private final RefreshTokenRepository refreshTokens;
     private final PasswordEncoder passwordEncoder;
@@ -48,9 +55,11 @@ public class UserAdminService {
     private final JsonMapper jsonMapper;
     private final Clock clock;
 
-    public UserAdminService(UserRepository users, RoleRepository roles, RefreshTokenRepository refreshTokens,
-            PasswordEncoder passwordEncoder, AuditService audit, JsonMapper jsonMapper, Clock clock) {
+    public UserAdminService(UserRepository users, DealerRepository dealers, RoleRepository roles,
+            RefreshTokenRepository refreshTokens, PasswordEncoder passwordEncoder, AuditService audit,
+            JsonMapper jsonMapper, Clock clock) {
         this.users = users;
+        this.dealers = dealers;
         this.roles = roles;
         this.refreshTokens = refreshTokens;
         this.passwordEncoder = passwordEncoder;
@@ -90,11 +99,19 @@ public class UserAdminService {
         if (users.existsByEmailIgnoreCase(body.email())) {
             throw new ConflictException("Email " + body.email() + " is already in use.");
         }
-        if (body.password().toLowerCase(Locale.ROOT).contains(body.username())) {
+        Dealer dealer = dealerFor(body);
+        if (body.password() == null && dealer == null) {
+            throw new BadRequestException("A password is required for HQ users.");
+        }
+        if (body.password() != null && body.password().toLowerCase(Locale.ROOT).contains(body.username())) {
             throw new BadRequestException("The password must not contain the username.");
         }
-        User user = users.saveAndFlush(new User(body.username(), body.email().strip(), body.fullName().strip(),
-                passwordEncoder.encode(body.password()), role(body.role())));
+        // Without a password the account can't sign in until the dealer uses a set-password link.
+        String password = body.password() != null ? body.password() : unusablePassword();
+        User newUser = new User(body.username(), body.email().strip(), body.fullName().strip(),
+                passwordEncoder.encode(password), role(body.role()));
+        newUser.setDealer(dealer);
+        User user = users.saveAndFlush(newUser);
         UserDto dto = toDto(user);
         audit.record(AuditEvent.of("CREATE", "USER", String.valueOf(user.getId()))
                 .withActor(actor).withChange(null, json(dto)));
@@ -108,6 +125,9 @@ public class UserAdminService {
         guardSupervisorRole(user.getRole().getCode(), actor);
         String before = json(toDto(user));
         if (body.role() != null && body.role() != user.getRole().getCode()) {
+            if (body.role() == RoleCode.DEALER || user.getRole().getCode() == RoleCode.DEALER) {
+                throw new ConflictException("Dealer accounts can't change role; create a new account instead.");
+            }
             if (user.getId().equals(actor.id())) {
                 throw new ConflictException("You cannot change your own role.");
             }
@@ -156,6 +176,27 @@ public class UserAdminService {
         }
     }
 
+    /** DEALER accounts must name an existing dealership; HQ accounts must not. */
+    private Dealer dealerFor(CreateUserRequest body) {
+        if (body.role() != RoleCode.DEALER) {
+            if (body.dealerId() != null) {
+                throw new BadRequestException("Only DEALER accounts can be linked to a dealer.");
+            }
+            return null;
+        }
+        if (body.dealerId() == null) {
+            throw new BadRequestException("A DEALER account needs a dealerId.");
+        }
+        return dealers.findById(body.dealerId())
+                .orElseThrow(() -> new NotFoundException("Dealer " + body.dealerId() + " not found."));
+    }
+
+    private static String unusablePassword() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
+    }
+
     private User find(Long id) {
         return users.findWithRoleById(id).orElseThrow(() -> new NotFoundException("User " + id + " not found."));
     }
@@ -170,6 +211,7 @@ public class UserAdminService {
 
     static UserDto toDto(User u) {
         return new UserDto(u.getId(), u.getUsername(), u.getEmail(), u.getFullName(), u.getRole().getCode(),
-                u.isActive(), u.getLastLoginAt(), u.getVersion(), u.getCreatedAt(), u.getUpdatedAt());
+                u.isActive(), u.getLastLoginAt(), u.getVersion(), u.getCreatedAt(), u.getUpdatedAt(),
+                u.getDealer() == null ? null : u.getDealer().getId());
     }
 }

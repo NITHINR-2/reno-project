@@ -1,6 +1,7 @@
 package com.renault.fleet.user.entity;
 
 import com.renault.fleet.common.persistence.BaseEntity;
+import com.renault.fleet.dealer.entity.Dealer;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,7 +10,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
-/** An HQ user. Exactly one role per user; usernames and emails are unique case-insensitively. */
+/** An HQ or dealer user (DEALER users carry their dealership). Exactly one role per user; usernames and emails are unique case-insensitively. */
 @Entity
 @Table(name = "users")
 public class User extends BaseEntity {
@@ -35,6 +36,11 @@ public class User extends BaseEntity {
 
     private Instant lastLoginAt;
 
+    /** Set only for DEALER users; the Dealer Portal scopes every query to it. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dealer_id")
+    private Dealer dealer;
+
     protected User() {
     }
 
@@ -58,4 +64,6 @@ public class User extends BaseEntity {
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
     public Instant getLastLoginAt() { return lastLoginAt; }
+    public Dealer getDealer() { return dealer; }
+    public void setDealer(Dealer dealer) { this.dealer = dealer; }
 }

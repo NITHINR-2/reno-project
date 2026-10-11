@@ -3,6 +3,7 @@ package com.renault.fleet.fleetrequest.entity;
 import com.renault.fleet.catalog.entity.VehicleVariant;
 import com.renault.fleet.common.persistence.BaseEntity;
 import com.renault.fleet.dealer.entity.Dealer;
+import com.renault.fleet.dealerportal.entity.DealerOrder;
 import com.renault.fleet.fleetrequest.service.ProductionCalculator;
 import com.renault.fleet.production.entity.Plant;
 import com.renault.fleet.user.entity.User;
@@ -92,6 +93,13 @@ public class FleetRequest extends BaseEntity {
     @JoinColumn(name = "stock_mapped_by_id")
     private User stockMappedBy;
 
+    /** Set when the request was raised as a line of a Dealer Portal order (V13). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dealer_order_id")
+    private DealerOrder dealerOrder;
+
+    private Integer dealerOrderLineNo;
+
     protected FleetRequest() {
     }
 
@@ -162,6 +170,12 @@ public class FleetRequest extends BaseEntity {
     public User getCreatedBy() { return createdBy; }
     public User getAssignedTo() { return assignedTo; }
     public void setAssignedTo(User assignedTo) { this.assignedTo = assignedTo; }
+    public void linkToDealerOrder(DealerOrder order, int lineNo) {
+        this.dealerOrder = order;
+        this.dealerOrderLineNo = lineNo;
+    }
+    public DealerOrder getDealerOrder() { return dealerOrder; }
+    public Integer getDealerOrderLineNo() { return dealerOrderLineNo; }
     public Instant getStockMappedAt() { return stockMappedAt; }
     public User getStockMappedBy() { return stockMappedBy; }
 }

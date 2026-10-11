@@ -1,6 +1,7 @@
 package com.renault.fleet.workflow.service;
 
 import static com.renault.fleet.fleetrequest.entity.FleetRequestStatus.*;
+import static com.renault.fleet.user.entity.RoleCode.DEALER;
 import static com.renault.fleet.user.entity.RoleCode.FINANCE_TEAM;
 import static com.renault.fleet.user.entity.RoleCode.MARKETING_HEAD;
 import static com.renault.fleet.user.entity.RoleCode.MARKETING_MANAGER;
@@ -97,9 +98,13 @@ public final class WorkflowTransitions {
         rows.add(row(FINANCIALLY_CLEARED, WorkflowAction.SCHEDULE_DISPATCH, DISPATCH_SCHEDULED, NO_PRODUCTION, false));
         rows.add(row(PRODUCTION_SCHEDULED, WorkflowAction.SCHEDULE_DISPATCH, DISPATCH_SCHEDULED, Guard.NONE, false));
         rows.add(row(DISPATCH_SCHEDULED, WorkflowAction.COMPLETE, COMPLETED, Guard.NONE, false));
+        // A dealer may withdraw its own request only while Marketing is still reviewing it (ownership is checked by
+        // the Dealer Portal service before it calls the workflow).
         Arrays.stream(FleetRequestStatus.values())
                 .filter(status -> !status.isTerminal())
-                .forEach(status -> rows.add(row(status, WorkflowAction.CANCEL, CANCELLED, Guard.NONE, true)));
+                .forEach(status -> rows.add(status == PENDING_MARKETING_REVIEW
+                        ? row(status, WorkflowAction.CANCEL, CANCELLED, Guard.NONE, true, DEALER)
+                        : row(status, WorkflowAction.CANCEL, CANCELLED, Guard.NONE, true)));
         return List.copyOf(rows);
     }
 

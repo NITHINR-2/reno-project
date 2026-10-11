@@ -14,5 +14,6 @@ public record UserDto(
         Instant lastLoginAt,
         Long version,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        Long dealerId) {
 }

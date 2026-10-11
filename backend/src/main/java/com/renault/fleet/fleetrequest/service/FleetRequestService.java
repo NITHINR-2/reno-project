@@ -11,6 +11,7 @@ import com.renault.fleet.common.persistence.Versions;
 import com.renault.fleet.dealer.entity.Dealer;
 import com.renault.fleet.dealer.entity.DealerStatus;
 import com.renault.fleet.dealer.repository.DealerRepository;
+import com.renault.fleet.dealerportal.entity.DealerOrder;
 import com.renault.fleet.fleetrequest.dto.CreateFleetRequestDto;
 import com.renault.fleet.fleetrequest.dto.FleetRequestDetailDto;
 import com.renault.fleet.fleetrequest.dto.FleetRequestFilter;
@@ -35,6 +36,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Create, edit and query fleet requests. Status changes go through {@code WorkflowService}, never here. */
@@ -111,13 +113,32 @@ public class FleetRequestService {
         request.setProductionEstimateWeeks(dto.productionEstimateWeeks());
         request.setRequestedDeliveryDate(dto.requestedDeliveryDate());
         request.setNotes(dto.notes());
+        persistNew(request, actor);
+        return assembler.toDetail(request, actor.role());
+    }
+
+    /**
+     * One line of a Dealer Portal order. Enters PENDING_MARKETING_REVIEW with no plant and a zero required deposit;
+     * Marketing sets both during review. The caller has checked that the dealer is ACTIVE and owns the order.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public FleetRequest createForDealerOrder(DealerOrder order, int lineNo, Long variantId, int quantity,
+            AuthenticatedUser actor) {
+        FleetRequest request = new FleetRequest(nextRequestNumber(), order.getDealer(), activeVariant(variantId),
+                quantity, users.getReferenceById(actor.id()));
+        request.linkToDealerOrder(order, lineNo);
+        request.setRequestedDeliveryDate(order.getRequestedDeliveryDate());
+        request.setNotes(order.getNotes());
+        persistNew(request, actor);
+        return request;
+    }
+
+    private void persistNew(FleetRequest request, AuthenticatedUser actor) {
         sla.enterStage(request);
         repository.saveAndFlush(request);
-
         history.record(request, null, request.getStatus(), CREATED, actor, null, null);
         audit.record(AuditEvent.of("CREATE", "FLEET_REQUEST", String.valueOf(request.getId()))
                 .withActor(actor).withChange(null, auditMapper.json(request)));
-        return assembler.toDetail(request, actor.role());
     }
 
     @Transactional

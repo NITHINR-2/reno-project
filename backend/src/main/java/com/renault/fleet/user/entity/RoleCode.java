@@ -6,5 +6,6 @@ public enum RoleCode {
     SUPERVISOR,
     MARKETING_MANAGER,
     MARKETING_HEAD,
-    FINANCE_TEAM
+    FINANCE_TEAM,
+    DEALER
 }

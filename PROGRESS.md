@@ -507,3 +507,21 @@ Waiting for the next phase prompt. Nothing from later phases has been started.
 | `npm test -- --run --reporter=dot` / `npm run lint` / `npm run build` | **16 files, 134 tests passed** / 0 findings / OK |
 
 Backend unchanged, not re-run (last: 1361 tests, 0 failures).
+
+---
+
+## Phase D1 — Dealer Portal, backend (2026-10-11) ✅
+
+**No new dependencies.** CLAUDE.md has no Dealer Portal section; built from the phase prompt (choices in DECISIONS.md). **V13:** DEALER role + DEALER_PORTAL/CATALOGUE_MANAGE permissions, `users.dealer_id`, `set_password_tokens`, `dealer_orders` (+ `fleet_requests.dealer_order_id/line_no`), catalogue columns on `vehicle_models`, `payment_proofs`. **API:** `/api/dealer/*` — catalogue (active only), orders (one fleet request per line), order/request lists and details scoped to the dealer (others' ids → 404, simplified statuses), cancel while in review (workflow row; later → 409), payment-proof upload (PDF/PNG/JPEG by magic bytes, ≤5 MB → pending receipt), own issued-quotation PDF. Admin: `/api/admin/catalogue` CRUD (ADMIN, SUP), `POST /api/admin/users/{id}/set-password-link`, DEALER accounts need `dealerId`. Public: `/api/public/set-password[/check]` (hashed, 72 h, single use, rate-limited). Finance: `GET /api/payment-receipts/{id}/proof`. Dev seed: catalogue text + `dealer.<code>` per dealer (`DEV_DEALER_PASSWORD`).
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o test -Dtest=WorkflowTransitionsTest,MigrationSchemaTest` | 1 failure: expected migration "12" → bumped to 13 (plus table/role counts, DEALER cancel row) |
+| `-Dtest=DealerPortalApiTest` | 1st: 2 test-side bugs (JSON list matcher, varargs cast) → **8 passed** |
+| `-Dtest=DealerPaymentApiTest` / `SetPasswordApiTest` / `DevDealerPortalSeederTest` | 1 compile fix (multipart builder type), 1 missing repo method in the test → **4 / 5 / 2 passed** |
+| `./mvnw -q -o verify` (1st) | 1 failure: AdminApiTest role counts (5→6 roles, SUP 21→22 perms, ADMIN + CATALOGUE_MANAGE) → updated |
+| `./mvnw -q -o verify` (final) | **exit 0 — 1582 tests, 0 failures, 0 errors** |
+
+**Open / broken:** the current frontend's `ROLES` enum lacks DEALER, so after V13 the Admin Console Roles tab (and Users tab once dealer users exist) fails to parse — fix first in the frontend phase. No email delivery for set-password links (admin copies the URL). Not run live against the dev DB (V13 applies on your next backend start; add `DEV_DEALER_PASSWORD` to `backend/.env` for dealer logins). Frontend not touched or re-run.
+
+**Next:** waiting for the next phase prompt (Dealer Portal frontend).

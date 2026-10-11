@@ -175,10 +175,10 @@ class AdminApiTest {
     void rolesAreListedWithTheirPermissionsForUserAdmins() throws Exception {
         call(get("/api/admin/roles"), admin)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(5))
+                .andExpect(jsonPath("$.totalElements").value(6))
                 .andExpect(jsonPath("$.content[?(@.code == 'ADMIN')].permissions[*].code",
-                        org.hamcrest.Matchers.containsInAnyOrder("ADMIN_DEALERS_MANAGE", "ADMIN_USERS_MANAGE", "AUDIT_LOG_READ")))
-                .andExpect(jsonPath("$.content[?(@.code == 'SUPERVISOR')].permissions.length()").value(21));
+                        org.hamcrest.Matchers.containsInAnyOrder("ADMIN_DEALERS_MANAGE", "ADMIN_USERS_MANAGE", "AUDIT_LOG_READ", "CATALOGUE_MANAGE")))
+                .andExpect(jsonPath("$.content[?(@.code == 'SUPERVISOR')].permissions.length()").value(22));
         call(get("/api/admin/roles"), supervisor).andExpect(status().isOk());
         call(get("/api/admin/roles"), manager).andExpect(status().isForbidden());
     }

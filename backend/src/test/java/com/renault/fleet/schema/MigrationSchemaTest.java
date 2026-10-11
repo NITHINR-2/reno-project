@@ -51,24 +51,33 @@ class MigrationSchemaTest {
     void allMigrationsAppliedAndNothingPending() {
         assertThat(flyway.info().pending()).isEmpty();
         MigrationInfo current = flyway.info().current();
-        assertThat(current.getVersion().getVersion()).isEqualTo("12");
+        assertThat(current.getVersion().getVersion()).isEqualTo("13");
 
         List<String> tables = jdbc.queryForList("""
                 select table_name from information_schema.tables
                 where table_schema = 'public' and table_type = 'BASE TABLE' and table_name <> 'flyway_schema_history'
                 """, String.class);
-        assertThat(tables).hasSize(23).contains("tax_rates", "refresh_tokens", "fleet_requests", "quotations", "audit_logs", "sla_policies");
+        assertThat(tables).hasSize(26).contains("dealer_orders", "set_password_tokens", "payment_proofs", "tax_rates", "refresh_tokens", "fleet_requests", "quotations", "audit_logs", "sla_policies");
     }
 
     @Test
     void rolePermissionsAreSeeded() {
-        assertThat(jdbc.queryForObject("select count(*) from roles", Long.class)).isEqualTo(5L);
+        assertThat(jdbc.queryForObject("select count(*) from roles", Long.class)).isEqualTo(6L);
         assertThat(jdbc.queryForObject("""
                 select count(*) from role_permissions rp join roles r on r.id = rp.role_id
                 join permissions p on p.id = rp.permission_id where r.code = 'ADMIN' and p.code like 'FLEET%'
                 """, Long.class)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from role_permissions rp join roles r on r.id = rp.role_id where r.code = 'SUPERVISOR'", Long.class))
-                .isEqualTo(jdbc.queryForObject("select count(*) from permissions", Long.class));
+                .isEqualTo(jdbc.queryForObject("select count(*) from permissions where code <> 'DEALER_PORTAL'", Long.class));
+        // DEALER holds only the portal permission; no HQ role holds it.
+        assertThat(jdbc.queryForList("""
+                select p.code from role_permissions rp join roles r on r.id = rp.role_id
+                join permissions p on p.id = rp.permission_id where r.code = 'DEALER'
+                """, String.class)).containsExactly("DEALER_PORTAL");
+        assertThat(jdbc.queryForObject("""
+                select count(*) from role_permissions rp join roles r on r.id = rp.role_id
+                join permissions p on p.id = rp.permission_id where p.code = 'DEALER_PORTAL' and r.code <> 'DEALER'
+                """, Long.class)).isZero();
     }
 
     @Test

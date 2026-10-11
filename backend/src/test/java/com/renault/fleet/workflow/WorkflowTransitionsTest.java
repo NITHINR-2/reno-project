@@ -5,6 +5,7 @@ import static com.renault.fleet.user.entity.RoleCode.ADMIN;
 import static com.renault.fleet.user.entity.RoleCode.FINANCE_TEAM;
 import static com.renault.fleet.user.entity.RoleCode.MARKETING_HEAD;
 import static com.renault.fleet.user.entity.RoleCode.MARKETING_MANAGER;
+import static com.renault.fleet.user.entity.RoleCode.DEALER;
 import static com.renault.fleet.user.entity.RoleCode.SUPERVISOR;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -74,7 +75,8 @@ class WorkflowTransitionsTest {
                 new Row(DISPATCH_SCHEDULED, WorkflowAction.COMPLETE, COMPLETED, Set.of(SUPERVISOR))));
         for (FleetRequestStatus s : FleetRequestStatus.values()) {
             if (s != COMPLETED && s != CANCELLED) {
-                rows.add(new Row(s, WorkflowAction.CANCEL, CANCELLED, Set.of(SUPERVISOR)));
+                rows.add(new Row(s, WorkflowAction.CANCEL, CANCELLED,
+                        s == PENDING_MARKETING_REVIEW ? Set.of(DEALER, SUPERVISOR) : Set.of(SUPERVISOR)));
             }
         }
         return rows;
