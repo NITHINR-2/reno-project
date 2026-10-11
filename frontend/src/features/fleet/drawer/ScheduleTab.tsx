@@ -1,11 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarPlus, Truck } from 'lucide-react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Form } from '@/components/forms/Form'
 import { TextField } from '@/components/forms/TextField'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/useToast'
@@ -94,18 +96,14 @@ function ProductionForm({ request }: { request: FleetRequestDetail }) {
     resolver: zodResolver(productionSchema),
     defaultValues: { scheduledStart: todayIST(), estimatedCompletion: '', notes: '' },
   })
+  const [confirming, setConfirming] = useState<z.infer<typeof productionSchema> | null>(null)
   return (
     <Section title={`Schedule production of ${formatCount(request.productionRequired)} units`}>
       <Form
         form={form}
         aria-label="Schedule production"
         className="space-y-4"
-        onSubmit={(v) =>
-          schedule.mutate(
-            { ...v, notes: v.notes || undefined, version: request.version },
-            { onSuccess: () => toast.success('Production scheduled'), onError: (e) => reportError(toast, e, form) },
-          )
-        }
+        onSubmit={setConfirming}
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <TextField name="scheduledStart" label="Start" type="date" min={todayIST()} required />
@@ -118,6 +116,29 @@ function ProductionForm({ request }: { request: FleetRequestDetail }) {
           </Button>
         </div>
       </Form>
+      <ConfirmDialog
+        open={confirming !== null}
+        title="Schedule production?"
+        description={
+          confirming
+            ? `${formatCount(request.productionRequired)} units from ${formatDate(confirming.scheduledStart)} to ${formatDate(confirming.estimatedCompletion)}. The request moves to production scheduled.`
+            : undefined
+        }
+        confirmLabel="Schedule production"
+        loading={schedule.isPending}
+        onCancel={() => setConfirming(null)}
+        onConfirm={() =>
+          confirming &&
+          schedule.mutate(
+            { ...confirming, notes: confirming.notes || undefined, version: request.version },
+            {
+              onSuccess: () => toast.success('Production scheduled', `${request.requestNumber} is now production scheduled.`),
+              onError: (e) => reportError(toast, e, form),
+              onSettled: () => setConfirming(null),
+            },
+          )
+        }
+      />
     </Section>
   )
 }
@@ -129,24 +150,14 @@ function DispatchForm({ request }: { request: FleetRequestDetail }) {
     resolver: zodResolver(dispatchSchema),
     defaultValues: { scheduledDate: '', carrier: '', vehicleReference: '', notes: '' },
   })
+  const [confirming, setConfirming] = useState<z.infer<typeof dispatchSchema> | null>(null)
   return (
     <Section title={`Schedule dispatch of ${formatCount(request.quantity)} units`}>
       <Form
         form={form}
         aria-label="Schedule dispatch"
         className="space-y-4"
-        onSubmit={(v) =>
-          schedule.mutate(
-            {
-              scheduledDate: v.scheduledDate,
-              carrier: v.carrier || undefined,
-              vehicleReference: v.vehicleReference || undefined,
-              notes: v.notes || undefined,
-              version: request.version,
-            },
-            { onSuccess: () => toast.success('Dispatch scheduled'), onError: (e) => reportError(toast, e, form) },
-          )
-        }
+        onSubmit={setConfirming}
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <TextField name="scheduledDate" label="Dispatch date" type="date" min={todayIST()} required />
@@ -160,6 +171,31 @@ function DispatchForm({ request }: { request: FleetRequestDetail }) {
           </Button>
         </div>
       </Form>
+      <ConfirmDialog
+        open={confirming !== null}
+        title="Schedule dispatch?"
+        description={confirming ? `${formatCount(request.quantity)} units on ${formatDate(confirming.scheduledDate)}. The request moves to dispatch scheduled.` : undefined}
+        confirmLabel="Schedule dispatch"
+        loading={schedule.isPending}
+        onCancel={() => setConfirming(null)}
+        onConfirm={() =>
+          confirming &&
+          schedule.mutate(
+            {
+              scheduledDate: confirming.scheduledDate,
+              carrier: confirming.carrier || undefined,
+              vehicleReference: confirming.vehicleReference || undefined,
+              notes: confirming.notes || undefined,
+              version: request.version,
+            },
+            {
+              onSuccess: () => toast.success('Dispatch scheduled', `${request.requestNumber} is now dispatch scheduled.`),
+              onError: (e) => reportError(toast, e, form),
+              onSettled: () => setConfirming(null),
+            },
+          )
+        }
+      />
     </Section>
   )
 }

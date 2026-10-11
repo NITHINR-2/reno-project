@@ -6,7 +6,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/useToast'
-import { formatDate, formatINR, statusLabel } from '@/lib/format'
+import { formatCount, formatDate, formatINR, statusLabel } from '@/lib/format'
 import type { FleetRequestDetail, Quotation } from '../api'
 import { useCalculateQuotation, useFleetPart, useIssueQuotation } from '../queries'
 import { DetailList, ReadOnlyNotice, Rows, Section } from './parts'
@@ -109,7 +109,7 @@ function Breakdown({ quotation: q }: { quotation: Quotation }) {
       <DetailList
         items={[
           ['Base amount', formatINR(q.baseAmount)],
-          ['GST rate', `${(q.gstRate * 100).toFixed(2).replace(/\.00$/, '')}%`],
+          ['GST rate', percent(q.gstRate)],
           ['GST amount', formatINR(q.gstAmount)],
           ['Total', <strong key="t">{formatINR(q.totalAmount)}</strong>],
           ['Required deposit', formatINR(q.requiredDeposit)],
@@ -119,6 +119,49 @@ function Breakdown({ quotation: q }: { quotation: Quotation }) {
           ['Valid until', formatDate(q.validUntil)],
         ]}
       />
+      {q.lines.length > 0 && <LineItems quotation={q} />}
+      {q.termsText && (
+        <p className="mt-4 whitespace-pre-line rounded-lg bg-surface-muted p-3 text-xs text-fg-muted">
+          <span className="font-semibold">Terms: </span>
+          {q.termsText}
+        </p>
+      )}
+      <p className="mt-3 text-xs text-fg-muted">All figures are calculated by the server (per line, rounded half-up to the paisa, then summed).</p>
     </>
+  )
+}
+
+const percent = (rate: number) => `${(rate * 100).toFixed(2).replace(/\.00$/, '')}%`
+
+function LineItems({ quotation: q }: { quotation: Quotation }) {
+  return (
+    <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+      <table className="w-full min-w-[520px] text-sm" aria-label="Quotation lines">
+        <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
+          <tr>
+            <th scope="col" className="px-3 py-2 text-left">Item</th>
+            <th scope="col" className="px-3 py-2 text-right">Qty</th>
+            <th scope="col" className="px-3 py-2 text-right">Unit price</th>
+            <th scope="col" className="px-3 py-2 text-right">Base</th>
+            <th scope="col" className="px-3 py-2 text-right">GST</th>
+            <th scope="col" className="px-3 py-2 text-right">Line total</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line tabular-nums">
+          {q.lines.map((line) => (
+            <tr key={line.lineNo}>
+              <td className="px-3 py-2">{line.description}</td>
+              <td className="px-3 py-2 text-right">{formatCount(line.quantity)}</td>
+              <td className="px-3 py-2 text-right">{formatINR(line.unitPrice)}</td>
+              <td className="px-3 py-2 text-right">{formatINR(line.baseAmount)}</td>
+              <td className="px-3 py-2 text-right">
+                {formatINR(line.gstAmount)} <span className="text-xs text-fg-muted">({percent(line.gstRate)})</span>
+              </td>
+              <td className="px-3 py-2 text-right font-medium">{formatINR(line.lineTotal)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

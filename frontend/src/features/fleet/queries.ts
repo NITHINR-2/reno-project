@@ -68,4 +68,6 @@ export const useIssueQuotation = () =>
 export const useRecordReceipt = (id: number) => useFleetMutation((body: ReceiptBody) => fleetApi.recordReceipt(id, body))
 export const useApproveReceipt = () => useFleetMutation((receiptId: number) => fleetApi.approveReceipt(receiptId))
 export const useScheduleProduction = (id: number) => useFleetMutation((body: ProductionBody) => fleetApi.scheduleProduction(id, body))
+export const useTransition = (id: number) =>
+  useFleetMutation(({ endpoint, ...body }: { endpoint: string; version: number; reason?: string }) => fleetApi.transition(id, endpoint, body))
 export const useScheduleDispatch = (id: number) => useFleetMutation((body: DispatchBody) => fleetApi.scheduleDispatch(id, body))

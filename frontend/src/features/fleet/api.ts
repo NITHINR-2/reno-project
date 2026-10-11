@@ -72,6 +72,9 @@ export const fleetApi = {
     detailSchema.parse((await api.post<unknown>(`/fleet-requests/${id}/schedule-production`, body)).data),
   scheduleDispatch: async (id: number, body: DispatchBody) =>
     detailSchema.parse((await api.post<unknown>(`/fleet-requests/${id}/schedule-dispatch`, body)).data),
+  /** Simple workflow transitions: `POST /fleet-requests/{id}/{endpoint}` with an optional reason and the version seen. */
+  transition: async (id: number, endpoint: string, body: { version: number; reason?: string }) =>
+    detailSchema.parse((await api.post<unknown>(`/fleet-requests/${id}/${endpoint}`, body)).data),
 }
 
 /** Money travels as a decimal string so it never passes through a float on the way to BigDecimal. */

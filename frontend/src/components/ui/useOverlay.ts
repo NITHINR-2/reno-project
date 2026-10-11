@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 
+// Open overlays, innermost last: only the top one reacts to Escape and Tab (e.g. a dialog over a drawer).
+const stack: object[] = []
+
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
 
 /** Shared modal behaviour: Esc closes, Tab stays inside, body scroll locks, focus returns on close. */
@@ -12,6 +15,8 @@ export function useOverlay<T extends HTMLElement>(open: boolean, onClose: () => 
 
   useEffect(() => {
     if (!open) return
+    const token = {}
+    stack.push(token)
     const previous = document.activeElement as HTMLElement | null
     const { overflow } = document.body.style
     document.body.style.overflow = 'hidden'
@@ -20,6 +25,7 @@ export function useOverlay<T extends HTMLElement>(open: boolean, onClose: () => 
     ;(first ?? panel)?.focus()
 
     function onKeyDown(event: KeyboardEvent) {
+      if (stack[stack.length - 1] !== token) return
       if (event.key === 'Escape') {
         event.stopPropagation()
         onCloseRef.current()
@@ -41,6 +47,7 @@ export function useOverlay<T extends HTMLElement>(open: boolean, onClose: () => 
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
+      stack.splice(stack.indexOf(token), 1)
       document.body.style.overflow = overflow
       previous?.focus?.()
     }

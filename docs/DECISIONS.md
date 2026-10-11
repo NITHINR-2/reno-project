@@ -181,3 +181,15 @@ One line per assumption or design choice, with its reason. Newest at the bottom 
 - **Money is sent as decimal strings and only formatted (never calculated) in the browser; dates are shown in IST, `LocalDate` values without time-zone shifting.**
 - **Stock mapping keeps rows this request fully allocated (0 available, so absent from `stock-options`) editable** — otherwise saving would silently release them.
 - **`DataTable` gained optional sortable headers (`sortKey`, `aria-sort`) instead of a new component; feature-local tabs and metric cards live under `features/fleet`** — Phase 5A rule: no new base components.
+
+## Phase 5B — Workflow actions, finance and scheduling flows
+
+- **Workflow buttons live in the drawer footer and come only from the server's `allowedActions` (role + state + guards); a fixed map turns each code into a label, endpoint and confirmation text** — the backend stays the authority; the UI never invents a transition.
+- **Every transition (qualify, forward, resubmit, approve, reject, forward to Finance, grant clearance, complete) goes through a ConfirmDialog; Reject requires a reason in the dialog (the server also requires it)** — none of them can be undone from the UI.
+- **Recording a receipt and scheduling production/dispatch also confirm first (receipts can't be deleted and references are single-use; scheduling moves the workflow). Stock mapping, edits and quotation calculation don't confirm** — they can be redone.
+- **`ISSUE_QUOTATION` is never offered in `allowedActions` before issue (its guard needs an issued quotation — seen in a live run), so the footer's "Quotation…" and "Receipts…" shortcuts follow the same role + state rules as the tabs** — otherwise Finance would see no footer action in PENDING_FINANCE_CLEARANCE.
+- **System steps (AWAIT_PAYMENT, VERIFY_FUNDS) never get buttons; CANCEL and other Supervisor overrides are left to the override phase.**
+- **Every mutation invalidates the whole `['fleet']` cache (row, summary, detail, tabs) and shows a success toast or the ProblemDetail as an error toast; a 409 says the data was reloaded.**
+- **The quotation view shows the backend's lines (qty, unit price, base, GST, line total), totals, deposit shortfall and terms exactly as returned; the browser formats but never computes money.**
+- **Only the top-most overlay handles Escape/Tab (a stack in `useOverlay`)** — a confirmation over the drawer closed both before.
+- **The toast container is a named `region` ("Notifications")** — screen readers can find it, and tests can tell a toast from a status badge with the same words.

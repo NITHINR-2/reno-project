@@ -397,3 +397,21 @@ Waiting for the next phase prompt. Nothing from later phases has been started.
 **Open:** workflow transition buttons, create-request form, Supervisor override/cancel UI are not built (next phase). SLA chips/“at risk” count are Phase 6. Bundle still needs code splitting. Not visually checked at 360/768/1024/1440.
 
 **Next:** waiting for the Phase 5B prompt.
+
+---
+
+## Phase 5B — Workflow actions, executive queue, finance and scheduling flows (2026-10-11) ✅
+
+**New dependencies:** none. **Backend:** unchanged. **Frontend:** drawer footer with workflow buttons from `allowedActions` — Marketing qualify / forward / resubmit, Executive approve / reject (reason required) / forward to Finance (the Executive Approval module is the queue, opening on its stage), Finance grant clearance, Supervisor complete; "Quotation…", "Receipts…", "Schedule production…/dispatch…" shortcuts open the tab forms. ConfirmDialog on every transition, receipt recording and scheduling; quotation view adds backend line items and terms; mutations invalidate `['fleet']` and toast. Fixed nested overlays (Escape closed the drawer under a dialog).
+
+| Command | Result |
+|---|---|
+| `npx vitest --run …/WorkflowActions` (1st) | 2 failures: toast text also matched a status badge; fixed by naming the toast region |
+| Live walk (dev jar on :18080 against scratch DB `fleet_p5bcheck`, same endpoints/bodies as the UI) | FLT-2026-0891 went map → qualify → forward → reject → resubmit → … → COMPLETED, 20 history rows; every `allowedActions` matched the UI map **except** Finance in PENDING_FINANCE_CLEARANCE (empty — ISSUE_QUOTATION's guard). Footer shortcuts changed to role + state rules; tests updated. Also confirmed: a fully-mapped stock row has 0 options (5A fix needed). Scratch DB dropped; dev DB untouched. |
+| `npm test -- --run --reporter=dot` | **9 files, 72 tests passed** |
+| `npm run lint` / `npm run build` | 0 findings / OK (766 kB, chunk warning) |
+| Backend | not changed, not re-run (last full run 5A: 1291 tests, 0 failures) |
+
+**Open:** Supervisor cancel / override / reassign UI; create-request form; SLA (Phase 6); bundle splitting; visual check at 360–1440 px.
+
+**Next:** waiting for the next phase prompt.

@@ -16,17 +16,29 @@ import { InventoryTab } from './InventoryTab'
 import { OverviewTab } from './OverviewTab'
 import { PaymentsTab } from './PaymentsTab'
 import { ScheduleTab } from './ScheduleTab'
+import { WorkflowActions } from './WorkflowActions'
 import { WorkflowTab } from './WorkflowTab'
 
 export function FleetDrawer({ requestId, onClose }: { requestId: number | null; onClose: () => void }) {
   // Keep the last id while the drawer animates out, so its content doesn't vanish mid-exit.
   const [shownId, setShownId] = useState(requestId)
-  if (requestId !== null && requestId !== shownId) setShownId(requestId)
+  const [tab, setTab] = useState<DrawerTab>('overview')
+  if (requestId !== null && requestId !== shownId) {
+    setShownId(requestId)
+    setTab('overview')
+  }
   const id = requestId ?? shownId
+  const { data } = useFleetDetail(id)
+  const user = useAuthUser()
 
   return (
-    <Drawer open={requestId !== null} onClose={onClose} title={<DrawerTitle id={id} />}>
-      {id !== null && <DrawerBody key={id} id={id} />}
+    <Drawer
+      open={requestId !== null}
+      onClose={onClose}
+      title={<DrawerTitle id={id} />}
+      footer={data && <WorkflowActions request={data} can={editability(user, data)} onOpenTab={setTab} />}
+    >
+      {id !== null && <DrawerBody key={id} id={id} tab={tab} onTabChange={setTab} />}
     </Drawer>
   )
 }
@@ -42,17 +54,19 @@ function DrawerTitle({ id }: { id: number | null }) {
   )
 }
 
-function DrawerBody({ id }: { id: number }) {
+type TabProps = { tab: DrawerTab; onTabChange: (tab: DrawerTab) => void }
+
+function DrawerBody({ id, ...tabProps }: { id: number } & TabProps) {
   const { data, isPending, error, refetch } = useFleetDetail(id)
   if (isPending) return <SkeletonRows rows={6} label="Loading request" />
   if (error) return <ErrorState title="Couldn't load this request" error={error} onRetry={() => void refetch()} />
-  return <DrawerTabsBody request={data} />
+  return <DrawerTabsBody request={data} {...tabProps} />
 }
 
-function DrawerTabsBody({ request }: { request: FleetRequestDetail }) {
+function DrawerTabsBody({ request, tab, onTabChange: setActive }: { request: FleetRequestDetail } & TabProps) {
   const user = useAuthUser()
   const tabs = visibleTabs(user)
-  const [active, setActive] = useState<DrawerTab>('overview')
+  const active = tabs.includes(tab) ? tab : 'overview'
   const can = editability(user, request)
   const idPrefix = `fleet-${request.id}`
 

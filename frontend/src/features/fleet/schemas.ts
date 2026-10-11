@@ -122,6 +122,21 @@ export const quotationSchema = z.object({
   validUntil: z.string().nullish(),
   issuedBy: z.string().nullish(),
   createdBy: z.string().nullish(),
+  termsText: z.string().nullish(),
+  lines: z
+    .array(
+      z.object({
+        lineNo: z.number(),
+        description: z.string(),
+        quantity: z.number(),
+        unitPrice: money,
+        baseAmount: money,
+        gstRate: z.number(),
+        gstAmount: money,
+        lineTotal: money,
+      }),
+    )
+    .default([]),
   version: z.number(),
   createdAt: z.string(),
 })

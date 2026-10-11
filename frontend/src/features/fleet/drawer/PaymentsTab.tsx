@@ -94,6 +94,21 @@ function RecordReceiptForm({ requestId }: { requestId: number }) {
   const toast = useToast()
   const record = useRecordReceipt(requestId)
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: blank() })
+  const [confirming, setConfirming] = useState<Values | null>(null)
+
+  function save(values: Values) {
+    record.mutate(
+      { ...values, transactionReference: values.transactionReference.trim(), amount: values.amount.trim() },
+      {
+        onSuccess: (r) => {
+          form.reset(blank())
+          toast.success('Receipt recorded', `${r.receiptNumber} awaits approval.`)
+        },
+        onError: (error) => reportError(toast, error, form),
+        onSettled: () => setConfirming(null),
+      },
+    )
+  }
 
   return (
     <Section title="Record a receipt">
@@ -101,18 +116,7 @@ function RecordReceiptForm({ requestId }: { requestId: number }) {
         form={form}
         aria-label="Record a receipt"
         className="space-y-4"
-        onSubmit={(values) =>
-          record.mutate(
-            { ...values, transactionReference: values.transactionReference.trim(), amount: values.amount.trim() },
-            {
-              onSuccess: (r) => {
-                form.reset(blank())
-                toast.success('Receipt recorded', `${r.receiptNumber} awaits approval.`)
-              },
-              onError: (error) => reportError(toast, error, form),
-            },
-          )
-        }
+        onSubmit={setConfirming}
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SelectField name="receiptType" label="Type" required options={RECEIPT_TYPES.map((t) => ({ value: t, label: statusLabel(t) }))} />
@@ -127,6 +131,19 @@ function RecordReceiptForm({ requestId }: { requestId: number }) {
           </Button>
         </div>
       </Form>
+      <ConfirmDialog
+        open={confirming !== null}
+        title="Record this receipt?"
+        description={
+          confirming
+            ? `${statusLabel(confirming.receiptType)} of ${formatINR(Number(confirming.amount))} by ${confirming.paymentMethod}, reference ${confirming.transactionReference.trim()}, received ${formatDate(confirming.receivedDate)}. Receipts can't be deleted; a reference can only be used once.`
+            : undefined
+        }
+        confirmLabel="Record receipt"
+        loading={record.isPending}
+        onCancel={() => setConfirming(null)}
+        onConfirm={() => confirming && save(confirming)}
+      />
     </Section>
   )
 }

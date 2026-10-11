@@ -65,7 +65,7 @@ function DrawerPanel({ onClose, title, description, footer, children }: Omit<Dra
           </button>
         </header>
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">{children}</div>
-        {footer && <footer className="flex justify-end gap-2 border-t border-line px-4 py-3 sm:px-6">{footer}</footer>}
+        {footer && <footer className="flex justify-end gap-2 empty:hidden border-t border-line px-4 py-3 sm:px-6">{footer}</footer>}
       </motion.div>
     </div>
   )
