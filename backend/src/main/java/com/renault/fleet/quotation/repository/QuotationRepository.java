@@ -35,6 +35,8 @@ public interface QuotationRepository extends JpaRepository<Quotation, Long> {
     @Query("select q from Quotation q where q.id = :id")
     Optional<Quotation> findByIdForUpdate(@Param("id") Long id);
 
+    Optional<Quotation> findByVerificationToken(String verificationToken);
+
     @Query(value = "select nextval('quotation_number_seq')", nativeQuery = true)
     long nextQuotationNumber();
 }

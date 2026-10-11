@@ -1,5 +1,5 @@
 import { Calculator, FileCheck2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -10,6 +10,7 @@ import { formatCount, formatDate, formatINR, statusLabel } from '@/lib/format'
 import type { FleetRequestDetail, Quotation } from '../api'
 import { useCalculateQuotation, useFleetPart, useIssueQuotation } from '../queries'
 import { DetailList, ReadOnlyNotice, Rows, Section } from './parts'
+import { QuotationPdfButton } from './QuotationPdfButton'
 import { reportError } from '@/lib/reportError'
 
 const STATUS_TONE = { ISSUED: 'success', DRAFT: 'accent', CANCELLED: 'neutral', SUPERSEDED: 'neutral' } as const
@@ -34,26 +35,31 @@ export function FinanceTab({ request, canEdit }: { request: FleetRequestDetail; 
       <Section
         title={current ? `Quotation ${current.quotationNumber}` : 'Quotation'}
         actions={
-          canEdit && (
+          (canEdit || current) && (
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={calculate.isPending}
-                onClick={() =>
-                  calculate.mutate(undefined, {
-                    onSuccess: (q) => toast.success('Quotation calculated', `${q.quotationNumber} is a draft; review it, then issue.`),
-                    onError: (error) => reportError(toast, error),
-                  })
-                }
-                icon={<Calculator className="size-4" aria-hidden="true" />}
-              >
-                {draft ? 'Recalculate' : 'Calculate'}
-              </Button>
-              {draft && (
-                <Button size="sm" onClick={() => setConfirmIssue(true)} icon={<FileCheck2 className="size-4" aria-hidden="true" />}>
-                  Issue
-                </Button>
+              {current && <QuotationPdfButton quotation={current} />}
+              {canEdit && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={calculate.isPending}
+                    onClick={() =>
+                      calculate.mutate(undefined, {
+                        onSuccess: (q) => toast.success('Quotation calculated', `${q.quotationNumber} is a draft; review it, then issue.`),
+                        onError: (error) => reportError(toast, error),
+                      })
+                    }
+                    icon={<Calculator className="size-4" aria-hidden="true" />}
+                  >
+                    {draft ? 'Recalculate' : 'Calculate'}
+                  </Button>
+                  {draft && (
+                    <Button size="sm" onClick={() => setConfirmIssue(true)} icon={<FileCheck2 className="size-4" aria-hidden="true" />}>
+                      Issue
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           )
@@ -70,6 +76,7 @@ export function FinanceTab({ request, canEdit }: { request: FleetRequestDetail; 
                 <span className="flex items-center gap-2">
                   {formatINR(q.totalAmount)}
                   <Badge tone={STATUS_TONE[q.status as keyof typeof STATUS_TONE] ?? 'neutral'}>{statusLabel(q.status)}</Badge>
+                  {q.id !== current?.id && <QuotationPdfButton quotation={q} compact />}
                 </span>
               </li>
             ))}
@@ -117,6 +124,9 @@ function Breakdown({ quotation: q }: { quotation: Quotation }) {
           ['Deposit shortfall', formatINR(q.depositShortfall)],
           ['Issued', q.issueDate ? `${formatDate(q.issueDate)}${q.issuedBy ? ` by ${q.issuedBy}` : ''}` : 'Not issued'],
           ['Valid until', formatDate(q.validUntil)],
+          ...(q.pdfSha256
+            ? [['Document SHA-256', <span key="h" className="break-all font-mono text-xs">{q.pdfSha256}</span>] as [string, ReactNode]]
+            : []),
         ]}
       />
       {q.lines.length > 0 && <LineItems quotation={q} />}

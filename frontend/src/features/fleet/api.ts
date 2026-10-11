@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { api } from '@/lib/api'
+import { blobErrorToJson, fileNameFrom } from '@/lib/download'
 import { pageSchema, type Page } from '@/lib/page'
 import {
   auditSchema,
@@ -65,6 +66,19 @@ export const fleetApi = {
     quotationSchema.parse((await api.post<unknown>(`/fleet-requests/${id}/quotations/calculate`, {})).data),
   issueQuotation: async (quotationId: number, version: number) =>
     quotationSchema.parse((await api.post<unknown>(`/quotations/${quotationId}/issue`, { version })).data),
+  /** Rendered (and the download audited) by the server; issued quotations come from their frozen snapshot. */
+  quotationPdf: async (quotationId: number) => {
+    try {
+      const res = await api.get<Blob>(`/quotations/${quotationId}/pdf`, {
+        responseType: 'blob',
+        headers: { Accept: 'application/pdf, application/problem+json' },
+      })
+      const disposition = res.headers['content-disposition'] as string | undefined
+      return { blob: res.data, fileName: fileNameFrom(disposition) ?? `quotation-${quotationId}.pdf` }
+    } catch (error) {
+      throw await blobErrorToJson(error)
+    }
+  },
   recordReceipt: async (id: number, body: ReceiptBody) =>
     receiptSchema.parse((await api.post<unknown>(`/fleet-requests/${id}/payment-receipts`, body)).data),
   approveReceipt: async (receiptId: number) =>

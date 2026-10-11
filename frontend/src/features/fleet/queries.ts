@@ -1,4 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { adminKeys } from '@/features/admin/queries'
+import { saveBlob } from '@/lib/download'
 import { fleetApi, type DispatchBody, type OverrideBody, type ListParams, type ProductionBody, type ReceiptBody, type UpdateBody } from './api'
 
 export const fleetKeys = {
@@ -75,3 +77,16 @@ export const useOverride = (id: number) => useFleetMutation((body: OverrideBody)
 export const useTransition = (id: number) =>
   useFleetMutation(({ endpoint, ...body }: { endpoint: string; version: number; reason?: string }) => fleetApi.transition(id, endpoint, body))
 export const useScheduleDispatch = (id: number) => useFleetMutation((body: DispatchBody) => fleetApi.scheduleDispatch(id, body))
+
+/** Downloads a quotation PDF. Each download writes an audit row, so the audit log list is refreshed. */
+export function useQuotationPdf() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (quotationId: number) => {
+      const { blob, fileName } = await fleetApi.quotationPdf(quotationId)
+      saveBlob(blob, fileName)
+      return fileName
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: adminKeys.audit() }),
+  })
+}

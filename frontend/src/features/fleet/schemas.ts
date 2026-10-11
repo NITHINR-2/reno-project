@@ -138,6 +138,8 @@ export const quotationSchema = z.object({
   issuedBy: z.string().nullish(),
   createdBy: z.string().nullish(),
   termsText: z.string().nullish(),
+  /** SHA-256 of the PDF frozen on issue; null for drafts. */
+  pdfSha256: z.string().nullish(),
   lines: z
     .array(
       z.object({

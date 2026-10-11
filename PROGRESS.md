@@ -454,3 +454,22 @@ Waiting for the next phase prompt. Nothing from later phases has been started.
 **Open:** your running backend on :8080 is the old build — restart it to apply V10. Business-hours SLA and pausing are out of scope. Dashboard (6B/6C), quotation PDF, bundle splitting, visual check at 360–1440 px remain.
 
 **Next:** waiting for the next phase prompt.
+
+---
+
+## Phase 6B — Quotation PDF (2026-10-11) ✅
+
+**New dependencies:** `io.github.openhtmltopdf:openhtmltopdf-pdfbox` 1.1.86 (PDFBox 3.0.7), `org.thymeleaf:thymeleaf-spring6` 3.1.5.RELEASE (Boot-managed), `com.google.zxing:core` 3.5.4; bundled DejaVu Sans fonts (for ₹). Frontend: none. **Backend:** V11 (`verification_token`, `snapshot_json`, `pdf_sha256`, CHECKs + immutability trigger, token backfill); Thymeleaf→PDF renderer (Indian grouping, amount in words, QR, DRAFT watermark, byte-reproducible output); issue freezes snapshot + SHA-256 + random token in the same transaction; `GET /api/quotations/{id}/pdf` (QUOTATION_READ, audited `QUOTATION_PDF_DOWNLOADED`, hash headers); public `GET /api/public/quotations/verify/{token}` (minimal fields, 404 otherwise) with a 30/min per-client limiter (429 + Retry-After). **Frontend:** Finance tab "Download PDF"/"Draft PDF" + per-row PDF, issued SHA-256 shown; public `/verify/quotation/:token` page (Genuine / Not found / Too many checks).
+
+| Command | Result |
+|---|---|
+| `./mvnw -q -o test -Dtest=IndianFormatTest,QuotationPdfRendererTest` | 1 failure: my expected words for 9,99,999 crore were wrong (test-side); fixed → 31 passed |
+| `./mvnw -q -o test -Dtest=…DocumentApiTest,MigrationSchemaTest,…` | 1st: Hibernate validate rejected `char(64)` mapping → `@JdbcTypeCode(CHAR)`; 2nd: 3 test-side fixes (jsonb spacing, migration 11, firewall 400 for `%3B`) → all passed (8 API, 8 schema, 27 format, 2 limiter, 4 renderer) |
+| `npx vitest --run …QuotationPdf.test.tsx` | 1st: duplicate button names (current quotation also in History) → dropped the history button for the current one → passed |
+| `npm test -- --run --reporter=dot` / `npm run lint` / `npm run build` | **15 files, 117 tests passed** / 0 findings / OK (chunk-size warning as before) |
+| `./mvnw -q -o verify` (final, after quieting openhtmltopdf's INFO logs) | **exit 0 — 1349 tests, 0 failures, 0 errors** |
+| Visual: sample issued + draft PDFs rendered to PNG | Layout, ₹ grouping, words, QR and watermark checked by eye; watermark draws over the text in a light tint (z-index ignored by the renderer), still legible |
+
+**Open:** not run live against the dev DB this phase (V11 applies on your next backend start; existing issued quotations freeze on first download). Rate limiter is per instance and trusts only the socket address. Executive Dashboard (6C), bundle splitting, visual check at 360–1440 px remain.
+
+**Next:** waiting for the next phase prompt.

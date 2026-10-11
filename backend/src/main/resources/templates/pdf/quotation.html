@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title th:text="'Quotation ' + ${q.quotationNumber}">Quotation</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm 20mm 16mm;
+      @bottom-center { content: "Page " counter(page) " of " counter(pages); font-family: 'DejaVu Sans'; font-size: 7.5pt; color: #6b7280; } }
+    body { font-family: 'DejaVu Sans'; font-size: 9pt; color: #1f2933; line-height: 1.35; }
+    .watermark { position: fixed; top: 95mm; left: 0; width: 178mm; text-align: center; font-size: 120pt;
+      font-weight: 700; color: #f1d4d4; transform: rotate(-35deg); z-index: -1; }
+    .head { width: 100%; border-bottom: 3px solid #e9b200; padding-bottom: 6pt; margin-bottom: 10pt; }
+    .head td { vertical-align: bottom; }
+    .wordmark { font-size: 15pt; font-weight: 700; color: #1f2329; }
+    .wordmark span { color: #b38600; }
+    .doc-title { text-align: right; font-size: 13pt; font-weight: 700; letter-spacing: 1pt; }
+    .meta, .parties, .lines, .totals { width: 100%; border-collapse: collapse; }
+    .meta td { padding: 2pt 0; }
+    .label { color: #6b7280; font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.5pt; }
+    .box { border: 1px solid #d9dde3; padding: 7pt; vertical-align: top; }
+    h2 { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.6pt; color: #6b7280; margin: 0 0 4pt 0; }
+    .lines { margin-top: 12pt; }
+    .lines th { background: #1f2329; color: #ffffff; font-size: 7.5pt; text-align: left; padding: 5pt 4pt; }
+    .lines td { border-bottom: 1px solid #e5e7eb; padding: 5pt 4pt; vertical-align: top; }
+    .num { text-align: right; white-space: nowrap; }
+    .totals { margin-top: 8pt; }
+    .totals td { padding: 3pt 4pt; }
+    .totals .grand td { border-top: 2px solid #1f2329; font-weight: 700; font-size: 10.5pt; }
+    .words { margin-top: 6pt; padding: 6pt; background: #f6f7f9; border-left: 3px solid #e9b200; }
+    .terms { margin-top: 12pt; font-size: 8pt; color: #374151; white-space: pre-wrap; }
+    .verify { margin-top: 14pt; width: 100%; }
+    .verify td { vertical-align: middle; }
+    .qr { width: 26mm; height: 26mm; }
+    .small { font-size: 7.5pt; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="watermark" th:if="${q.draft}">DRAFT</div>
+
+  <table class="head">
+    <tr>
+      <td><div class="wordmark">Renault Group <span>Fleet Portal</span></div>
+        <div class="small">Fleet sales · Manufacturer quotation</div></td>
+      <td class="doc-title" th:text="${q.draft} ? 'DRAFT QUOTATION' : 'TAX QUOTATION'">TAX QUOTATION</td>
+    </tr>
+  </table>
+
+  <table class="meta">
+    <tr>
+      <td><span class="label">Quotation no.</span><br /><strong th:text="${q.quotationNumber}">QT</strong></td>
+      <td><span class="label">Fleet request</span><br /><span th:text="${q.requestNumber}">FLT</span></td>
+      <td><span class="label">Issue date</span><br />
+        <span th:text="${q.issueDate} != null ? ${f.date(q.issueDate)} : 'Not issued (draft)'">date</span></td>
+      <td><span class="label">Valid until</span><br />
+        <span th:text="${q.validUntil} != null ? ${f.date(q.validUntil)} : ${q.validityDays} + ' days from issue'">date</span></td>
+    </tr>
+  </table>
+
+  <table class="parties" style="margin-top: 10pt;">
+    <tr>
+      <td class="box" style="width: 60%;">
+        <h2>Quotation for</h2>
+        <strong th:text="${q.dealer.name}">Dealer</strong>
+        <span class="small" th:text="'(' + ${q.dealer.dealerCode} + ')'">(code)</span><br />
+        <span th:text="${q.dealer.addressLine}">address</span><br />
+        <span th:text="${q.dealer.city} + ', ' + ${q.dealer.state} + ' ' + ${q.dealer.postalCode}">city</span><br />
+        <span th:if="${q.dealer.region != null}" th:text="'Region: ' + ${q.dealer.region}">region</span><br th:if="${q.dealer.region != null}" />
+        <span>GSTIN: </span><span th:text="${q.dealer.gstin} ?: '—'">gstin</span>
+        <div th:if="${q.dealer.contactName != null}" class="small" style="margin-top: 4pt;"
+             th:text="'Attn: ' + ${q.dealer.contactName} + (${q.dealer.contactPhone} != null ? ' · ' + ${q.dealer.contactPhone} : '') + (${q.dealer.contactEmail} != null ? ' · ' + ${q.dealer.contactEmail} : '')">contact</div>
+      </td>
+      <td class="box" style="width: 40%;">
+        <h2>Deposit position</h2>
+        <table style="width: 100%;">
+          <tr><td>Required deposit</td><td class="num" th:text="${f.rupees(q.requiredDeposit)}">0</td></tr>
+          <tr><td th:text="${q.draft} ? 'Deposit received' : 'Deposit received (at issue)'">Deposit received</td>
+            <td class="num" th:text="${f.rupees(q.depositReceived)}">0</td></tr>
+          <tr><td><strong>Shortfall</strong></td><td class="num"><strong th:text="${f.rupees(q.depositShortfall)}">0</strong></td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <table class="lines">
+    <thead>
+      <tr><th>#</th><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th>
+        <th class="num">Base amount</th><th class="num">GST</th><th class="num">GST amount</th><th class="num">Line total</th></tr>
+    </thead>
+    <tbody>
+      <tr th:each="line : ${q.lines}">
+        <td th:text="${line.lineNo}">1</td>
+        <td th:text="${line.description}">Vehicle</td>
+        <td class="num" th:text="${f.number(line.quantity)}">1</td>
+        <td class="num" th:text="${f.rupees(line.unitPrice)}">0</td>
+        <td class="num" th:text="${f.rupees(line.baseAmount)}">0</td>
+        <td class="num" th:text="${f.percent(line.gstRate)}">0</td>
+        <td class="num" th:text="${f.rupees(line.gstAmount)}">0</td>
+        <td class="num" th:text="${f.rupees(line.lineTotal)}">0</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td style="width: 60%;"></td><td>Base amount</td><td class="num" th:text="${f.rupees(q.baseAmount)}">0</td></tr>
+    <tr><td></td><td th:text="'GST @ ' + ${f.percent(q.gstRate)}">GST</td><td class="num" th:text="${f.rupees(q.gstAmount)}">0</td></tr>
+    <tr class="grand"><td></td><td>Total (INR)</td><td class="num" th:text="${f.rupees(q.totalAmount)}">0</td></tr>
+  </table>
+
+  <div class="words"><span class="label">Amount in words</span><br /><strong th:text="${f.words(q.totalAmount)}">words</strong></div>
+
+  <div class="terms" th:if="${q.termsText != null}"><h2>Terms</h2><span th:text="${q.termsText}">terms</span></div>
+
+  <table class="verify">
+    <tr>
+      <td style="width: 30mm;" th:if="${qr != null}"><img class="qr" th:src="${qr}" alt="Verification QR code" /></td>
+      <td>
+        <div th:if="${qr != null}">
+          <strong>Verify this quotation</strong><br />
+          <span class="small">Scan the code or open the link below to confirm the quotation is genuine.</span><br />
+          <span class="small" th:text="${q.verificationUrl}">url</span>
+        </div>
+        <div th:if="${qr == null}" class="small">This is a draft. It is not a valid quotation and carries no
+          verification code until it is issued.</div>
+        <div class="small" style="margin-top: 4pt;" th:if="${q.issuedBy != null}" th:text="'Issued by ' + ${q.issuedBy}">issued by</div>
+        <div class="small">Issuing a quotation is not a receipt of payment. Computer-generated document; no signature required.</div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

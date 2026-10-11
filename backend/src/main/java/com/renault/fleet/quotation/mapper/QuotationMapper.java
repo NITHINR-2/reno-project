@@ -16,7 +16,7 @@ public class QuotationMapper {
                 q.getPaymentStatus(), q.getCurrency(), q.getGstRate(), q.getBaseAmount(), q.getGstAmount(),
                 q.getTotalAmount(), q.getRequiredDeposit(), q.getDepositReceived(), q.getDepositShortfall(),
                 q.getLineItems().stream().map(QuotationMapper::toLine).toList(), q.getIssueDate(), q.getValidUntil(),
-                q.getIssuedAt(), name(q.getIssuedBy()), name(q.getCreatedBy()), q.getTermsText(), q.getVersion(),
+                q.getIssuedAt(), name(q.getIssuedBy()), name(q.getCreatedBy()), q.getTermsText(), q.getPdfSha256(), q.getVersion(),
                 q.getCreatedAt());
     }
 

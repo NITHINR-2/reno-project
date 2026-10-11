@@ -62,6 +62,7 @@ public class QuotationService {
     private final WorkflowHistoryService history;
     private final AuditService audit;
     private final QuotationMapper mapper;
+    private final QuotationDocumentService documents;
     private final JsonMapper jsonMapper;
     private final Clock clock;
     private final int validityDays;
@@ -70,7 +71,8 @@ public class QuotationService {
     public QuotationService(QuotationRepository quotations, FleetRequestRepository requests, TaxRateRepository taxRates,
             UserRepository users, WorkflowService workflow, WorkflowFacts facts, PaymentReceiptRepository receipts,
             WorkflowHistoryService history,
-            AuditService audit, QuotationMapper mapper, JsonMapper jsonMapper, Clock clock,
+            AuditService audit, QuotationMapper mapper, QuotationDocumentService documents, JsonMapper jsonMapper,
+            Clock clock,
             @Value("${fleet.quotation.validity-days:30}") int validityDays,
             @Value("${fleet.quotation.default-terms:}") String defaultTerms) {
         this.quotations = quotations;
@@ -83,6 +85,7 @@ public class QuotationService {
         this.history = history;
         this.audit = audit;
         this.mapper = mapper;
+        this.documents = documents;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
         this.validityDays = validityDays;
@@ -173,6 +176,7 @@ public class QuotationService {
         // Money approved before issue still counts; the quotation itself never does.
         quotation.setPaymentStatus(QuotationPaymentStatus.from(
                 receipts.sumAmount(requestId, ReceiptStatus.APPROVED), quotation.getTotalAmount()));
+        documents.freezeOnIssue(quotation); // verification token, immutable snapshot and PDF hash
         quotations.saveAndFlush(quotation); // the partial unique index enforces one ISSUED per request here
 
         workflow.transition(requestId, WorkflowAction.ISSUE_QUOTATION, null, actor);

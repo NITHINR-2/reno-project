@@ -14,6 +14,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -85,6 +87,20 @@ public class Quotation extends BaseEntity {
     @Column(columnDefinition = "text")
     private String termsText;
 
+    /** Random, unguessable token behind the QR code; set on issue. */
+    @Column(length = 64, unique = true)
+    private String verificationToken;
+
+    /** Immutable JSON of everything the issued PDF shows (DB trigger refuses changes once written). */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private String snapshotJson;
+
+    /** SHA-256 (hex) of the PDF rendered from {@link #snapshotJson}. */
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 64)
+    private String pdfSha256;
+
     @OneToMany(mappedBy = "quotation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineNo")
     private List<QuotationLineItem> lineItems = new ArrayList<>();
@@ -138,4 +154,17 @@ public class Quotation extends BaseEntity {
     public String getTermsText() { return termsText; }
     public void setTermsText(String termsText) { this.termsText = termsText; }
     public List<QuotationLineItem> getLineItems() { return lineItems; }
+    public String getVerificationToken() { return verificationToken; }
+    public void setVerificationToken(String verificationToken) { this.verificationToken = verificationToken; }
+    public String getSnapshotJson() { return snapshotJson; }
+    public String getPdfSha256() { return pdfSha256; }
+
+    /** Freezes the issued document; the snapshot and its PDF hash are written once, together. */
+    public void freezeDocument(String snapshotJson, String pdfSha256) {
+        if (this.snapshotJson != null) {
+            throw new IllegalStateException("Quotation " + quotationNumber + " document is already frozen.");
+        }
+        this.snapshotJson = snapshotJson;
+        this.pdfSha256 = pdfSha256;
+    }
 }

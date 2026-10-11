@@ -2,6 +2,8 @@ package com.renault.fleet.config;
 
 import com.renault.fleet.security.AuthenticatedUserConverter;
 import com.renault.fleet.security.ProblemDetailSecurityHandler;
+import com.renault.fleet.security.PublicRateLimitFilter;
+import com.renault.fleet.security.PublicRateLimiter;
 import com.renault.fleet.security.XRequestedWithFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -27,7 +29,7 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticatedUserConverter converter,
-            ProblemDetailSecurityHandler problemHandler,
+            ProblemDetailSecurityHandler problemHandler, PublicRateLimiter publicRateLimiter,
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) throws Exception {
         http
                 // Bearer tokens aren't sent automatically by browsers; the refresh cookie has its own guard
@@ -44,6 +46,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(problemHandler)
                         .accessDeniedHandler(problemHandler))
                 .addFilterBefore(new XRequestedWithFilter(resolver), BearerTokenAuthenticationFilter.class)
+                .addFilterBefore(new PublicRateLimitFilter(publicRateLimiter, resolver), BearerTokenAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
                         .requestMatchers("/api/health", "/api/public/**", "/error").permitAll()

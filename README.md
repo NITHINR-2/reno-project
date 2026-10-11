@@ -88,6 +88,13 @@ Open http://localhost:5173. The page shows the backend and database health from 
 4. `POST /api/payment-receipts/{receiptId}/approve`. The deposits now cover ₹50,00,000, so the request becomes `FUNDS_VERIFIED`.
 5. `POST /api/fleet-requests/{id}/grant-clearance`. The request becomes `FINANCIALLY_CLEARED`.
 
+### Quotation PDF and verification (Phase 6B)
+
+- `GET /api/quotations/{id}/pdf` (Finance, Supervisor; Marketing Head may view) downloads the PDF; every download is audited. In the UI: request drawer → **Finance** tab → **Download PDF**.
+- Drafts carry a **DRAFT** watermark and no QR code. On issue the quotation is frozen: a JSON snapshot, the PDF's SHA-256 (shown in the Finance tab and sent as `X-Issued-SHA256`) and a random verification token. Later downloads are rendered from the snapshot, so they are byte-identical.
+- The QR code opens `<PUBLIC_BASE_URL>/verify/quotation/<token>` (set `PUBLIC_BASE_URL` in `backend/.env`; default `http://localhost:5173`). That public page calls `GET /api/public/quotations/verify/{token}` (30 requests/min per client address) and shows only the number, issue date, total and status.
+- The terms text comes from `fleet.quotation.default-terms` (placeholder wording; Finance owns it). The PDF uses the bundled DejaVu Sans font (free licence, `backend/src/main/resources/fonts/DejaVu-LICENSE.txt`) for the ₹ sign.
+
 ## Build and test
 
 ```bash

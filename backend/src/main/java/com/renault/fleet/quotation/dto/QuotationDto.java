@@ -10,7 +10,8 @@ import java.util.List;
 
 /**
  * A quotation with its full BigDecimal breakdown. {@code status} is the document state; {@code paymentStatus} is
- * separate and only ever moves when receipts are approved (issuing is never payment).
+ * separate and only ever moves when receipts are approved (issuing is never payment). {@code pdfSha256} is the hash of
+ * the PDF frozen on issue (null for drafts).
  */
 public record QuotationDto(
         Long id,
@@ -35,6 +36,7 @@ public record QuotationDto(
         String issuedBy,
         String createdBy,
         String termsText,
+        String pdfSha256,
         Long version,
         Instant createdAt) {
 

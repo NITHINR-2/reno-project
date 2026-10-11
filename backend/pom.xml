@@ -29,6 +29,8 @@
 	<properties>
 		<java.version>21</java.version>
 		<springdoc.version>3.1.1</springdoc.version>
+		<openhtmltopdf.version>1.1.86</openhtmltopdf.version>
+		<zxing.version>3.5.4</zxing.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -63,6 +65,21 @@
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+		<!-- Quotation PDF: Thymeleaf (standalone engine, no MVC view resolution) -> openhtmltopdf; QR via ZXing. -->
+		<dependency>
+			<groupId>org.thymeleaf</groupId>
+			<artifactId>thymeleaf-spring6</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.github.openhtmltopdf</groupId>
+			<artifactId>openhtmltopdf-pdfbox</artifactId>
+			<version>${openhtmltopdf.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.zxing</groupId>
+			<artifactId>core</artifactId>
+			<version>${zxing.version}</version>
 		</dependency>
 
 		<dependency>

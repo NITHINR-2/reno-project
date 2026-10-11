@@ -38,6 +38,12 @@ springdoc:
 
 fleet:
   version: "@project.version@"
+  # Where the frontend is served; the quotation QR code links to <public-base-url>/verify/quotation/<token>.
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:5173}
+  public-api:
+    rate-limit:
+      # Requests per client address per minute on /api/public/** (quotation verification).
+      per-minute: 30
   quotation:
     validity-days: 30
     # Placeholder terms; Finance owns the final wording.
@@ -80,6 +86,11 @@ spring:
     clean-disabled: true
 
 fleet:
+  public-base-url: http://portal.test
+  public-api:
+    rate-limit:
+      # Low, so the 429 path is reachable in tests; each test uses its own client address.
+      per-minute: 5
   sla:
     breach-scan:
       # Tests call SlaBreachJob.scan() directly; a background scan would race their assertions.

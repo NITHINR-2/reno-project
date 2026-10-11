@@ -11,6 +11,7 @@ import type { Stage } from '@/features/fleet/filters'
 import { ModulePage } from '@/features/modules/ModulePage'
 import { HomeRedirect, RequireAuth, RequirePermission } from './guards'
 import { NAV_ITEMS } from './navigation'
+import { QuotationVerifyPage } from '@/features/verify/QuotationVerifyPage'
 
 const DESCRIPTIONS: Record<string, string> = {
   '/fleet-evaluation': 'Evaluate fleet requests, map yard stock and compute production needs.',
@@ -48,6 +49,8 @@ const moduleRoutes: RouteObject[] = NAV_ITEMS.map((item) => ({
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage />, errorElement: <RouteErrorPage /> },
   { path: '/status', element: <HealthPage />, errorElement: <RouteErrorPage /> },
+  // Public: the quotation QR code lands here; no session needed.
+  { path: '/verify/quotation/:token', element: <QuotationVerifyPage />, errorElement: <RouteErrorPage /> },
   {
     element: <RequireAuth />,
     errorElement: <RouteErrorPage />,
